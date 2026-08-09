@@ -1,14 +1,10 @@
 "use client";
 import { useParams, useRouter } from 'next/navigation';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useGraphQL } from '@/hooks/useGraphQL';
-import { nhost } from '@/lib/nhost';
-import { createClient } from 'graphql-ws';
-
-const WS_URL = `wss://${process.env.NEXT_PUBLIC_NHOST_SUBDOMAIN}.hasura.${process.env.NEXT_PUBLIC_NHOST_REGION}.nhost.run/v1/graphql`;
 
 export default function WorkflowRunPage() {
   const params = useParams();
@@ -20,10 +16,7 @@ export default function WorkflowRunPage() {
   const [steps, setSteps] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [approving, setApproving] = useState(false);
-  const [liveConnected, setLiveConnected] = useState(false);
-  const cleanupRef = useRef<(() => void) | null>(null);
 
-  // Initial fetch via HTTP (reliable fallback)
   const fetchRun = useCallback(async () => {
     try {
       const data = await request(`
@@ -55,122 +48,21 @@ export default function WorkflowRunPage() {
       if (data.workflow_runs_by_pk) setRun(data.workflow_runs_by_pk);
       if (data.step_runs) setSteps(data.step_runs);
     } catch (err) {
-      console.error("Failed to fetch run", err);
+      console.error("Failed to fetch run data:", err);
     } finally {
       setLoading(false);
     }
   }, [runId, request]);
 
-  // WebSocket subscription for live updates
   useEffect(() => {
-    fetchRun(); // Initial load
+    fetchRun(); // Initial fetch
 
-    const token = nhost.auth.getAccessToken();
-    if (!token) {
-      // Fallback to polling if no token
-      const interval = setInterval(fetchRun, 2000);
-      return () => clearInterval(interval);
-    }
+    // Fast 1.5s interval polling while run is active or pending
+    const interval = setInterval(() => {
+      fetchRun();
+    }, 1500);
 
-    try {
-      const wsClient = createClient({
-        url: WS_URL,
-        connectionParams: {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-        shouldRetry: () => true,
-        retryAttempts: 5,
-        on: {
-          connected: () => setLiveConnected(true),
-          closed: () => setLiveConnected(false),
-          error: () => setLiveConnected(false),
-        },
-      });
-
-      // Subscribe to step_runs updates
-      const unsubSteps = wsClient.subscribe(
-        {
-          query: `
-            subscription SubscribeStepRuns($runId: uuid!) {
-              step_runs(where: { workflow_run_id: { _eq: $runId } }, order_by: { position: asc }) {
-                id
-                position
-                status
-                input
-                output
-                error
-                attempt_count
-                started_at
-                completed_at
-                workflow_step {
-                  type
-                  config
-                }
-              }
-            }
-          `,
-          variables: { runId },
-        },
-        {
-          next: (result) => {
-            const d = result.data as any;
-            if (d?.step_runs) {
-              setSteps(d.step_runs);
-            }
-          },
-          error: (err) => {
-            console.error('Step runs subscription error:', err);
-            setLiveConnected(false);
-          },
-          complete: () => {},
-        }
-      );
-
-      // Subscribe to workflow_run status updates
-      const unsubRun = wsClient.subscribe(
-        {
-          query: `
-            subscription SubscribeWorkflowRun($runId: uuid!) {
-              workflow_runs_by_pk(id: $runId) {
-                id
-                status
-                started_at
-                completed_at
-              }
-            }
-          `,
-          variables: { runId },
-        },
-        {
-          next: (result) => {
-            const d = result.data as any;
-            if (d?.workflow_runs_by_pk) {
-              setRun(d.workflow_runs_by_pk);
-            }
-          },
-          error: (err) => {
-            console.error('Workflow run subscription error:', err);
-          },
-          complete: () => {},
-        }
-      );
-
-      cleanupRef.current = () => {
-        unsubSteps();
-        unsubRun();
-        wsClient.dispose();
-      };
-
-      return () => {
-        if (cleanupRef.current) cleanupRef.current();
-      };
-    } catch (err) {
-      console.error('Failed to setup WebSocket, falling back to polling:', err);
-      const interval = setInterval(fetchRun, 2000);
-      return () => clearInterval(interval);
-    }
+    return () => clearInterval(interval);
   }, [runId, fetchRun]);
 
   const handleApprove = async (stepRunId: string) => {
@@ -184,10 +76,9 @@ export default function WorkflowRunPage() {
           }
         }
       `, { stepRunId });
-      // Subscription will auto-update, but fetch once for safety
-      setTimeout(fetchRun, 500);
+      fetchRun();
     } catch (err) {
-      console.error(err);
+      console.error('Approval failed:', err);
       alert('Failed to approve step');
     } finally {
       setApproving(false);
@@ -219,6 +110,8 @@ export default function WorkflowRunPage() {
   if (loading && !run) return <div className="p-8 text-center text-slate-400">Loading run details...</div>;
   if (!run) return <div className="p-8 text-center text-rose-500">Run not found</div>;
 
+  const isLive = run.status === 'running' || run.status === 'pending';
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <button onClick={() => router.back()} className="text-slate-400 hover:text-white text-sm flex items-center gap-1 transition-colors">
@@ -230,16 +123,15 @@ export default function WorkflowRunPage() {
           <h1 className="text-3xl font-bold text-white mb-2">Run Viewer</h1>
           <div className="flex items-center gap-3">
             <p className="text-slate-400 text-sm font-mono">{runId.slice(0, 8)}...</p>
-            {liveConnected && (
+            {isLive && (
               <span className="flex items-center gap-1.5 text-xs text-emerald-400">
                 <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-                Live
+                Live Updating
               </span>
             )}
-            {!liveConnected && (
-              <span className="flex items-center gap-1.5 text-xs text-slate-500">
-                <span className="w-2 h-2 bg-slate-500 rounded-full" />
-                Polling
+            {!isLive && (
+              <span className="text-xs text-slate-500">
+                Execution {run.status}
               </span>
             )}
           </div>
@@ -275,7 +167,7 @@ export default function WorkflowRunPage() {
                   {getStepIcon(step.status)}
                 </div>
                 <div>
-                  <h3 className="font-semibold text-white capitalize">{step.workflow_step.type.replace(/_/g, ' ')}</h3>
+                  <h3 className="font-semibold text-white capitalize">{step.workflow_step?.type?.replace(/_/g, ' ') || 'Step'}</h3>
                   <p className="text-xs text-slate-500">Step {step.position}{step.attempt_count > 1 ? ` · Attempt ${step.attempt_count}` : ''}</p>
                 </div>
               </div>
@@ -308,7 +200,7 @@ export default function WorkflowRunPage() {
             )}
 
             {/* Approval gate UI */}
-            {step.status === 'paused' && step.workflow_step.type === 'approval_gate' && (
+            {step.status === 'paused' && step.workflow_step?.type === 'approval_gate' && (
               <div className="mt-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
                 <div className="flex justify-between items-center">
                   <div>
