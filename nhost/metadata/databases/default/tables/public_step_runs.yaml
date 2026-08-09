@@ -1,0 +1,62 @@
+table:
+  name: step_runs
+  schema: public
+object_relationships:
+  - name: workflow_run
+    using:
+      foreign_key_constraint_on: workflow_run_id
+  - name: workflow_step
+    using:
+      foreign_key_constraint_on: workflow_step_id
+select_permissions:
+  - role: owner
+    permission:
+      columns: '*'
+      filter:
+        workflow_run:
+          _exists:
+            _table:
+              name: org_members
+              schema: public
+            _where:
+              _and:
+                - user_id:
+                    _eq: X-Hasura-User-Id
+                - org_id:
+                    _eq: org_id
+                - role:
+                    _eq: owner
+  - role: editor
+    permission:
+      columns: '*'
+      filter:
+        workflow_run:
+          _exists:
+            _table:
+              name: org_members
+              schema: public
+            _where:
+              _and:
+                - user_id:
+                    _eq: X-Hasura-User-Id
+                - org_id:
+                    _eq: org_id
+                - role:
+                    _eq: editor
+  - role: viewer
+    permission:
+      columns: '*'
+      filter:
+        workflow_run:
+          _exists:
+            _table:
+              name: org_members
+              schema: public
+            _where:
+              _and:
+                - user_id:
+                    _eq: X-Hasura-User-Id
+                - org_id:
+                    _eq: org_id
+                - role:
+                    _eq: viewer

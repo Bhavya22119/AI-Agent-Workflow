@@ -11,7 +11,15 @@
   "dependencies": {
     "next": "16.3.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "@nhost/nextjs": "latest",
+    "@nhost/react": "latest",
+    "@nhost/nhost-js": "latest",
+    "graphql-ws": "^5.16.0",
+    "graphql-request": "^7.1.0",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.3.0",
+    "lucide-react": "^0.395.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

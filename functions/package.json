@@ -1,0 +1,13 @@
+{
+  "name": "functions",
+  "private": true,
+  "dependencies": {
+    "zod": "^3.22.0",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

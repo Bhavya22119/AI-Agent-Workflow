@@ -1,36 +1,36 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Agent Workflow Builder
 
-## Getting Started
+A production-quality workflow orchestration engine designed to chain AI agents and HTTP requests across isolated organizations. Built on Next.js, Nhost, Hasura, and PostgreSQL.
 
-First, run the development server:
+## Features
+- **Multi-Tenant Org Isolation:** Everything is strictly gated by `org_id` and `org_members`. Even known workflow IDs return empty sets for unauthenticated or cross-org users.
+- **Real-Time Run Viewer:** Users can watch step-by-step executions via Hasura GraphQL subscriptions as Serverless Functions execute logic in the background.
+- **6 Step Types:** `llm_call`, `http_request`, `db_write`, `notify`, `conditional_branch`, and `approval_gate`.
+- **Dynamic Branching & Approval Gates:** Support for mid-run pauses and role-based continuation (preventing double approvals with conditional updates).
+- **Triggers:** Manual executions and webhook invocations using shared secrets.
+- **Quotas & Retries:** Organization-level limits dynamically lock execution when exhausted. Transient failures automatically retry before failing permanently.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Technical Architecture
+Please see [ARCHITECTURE.md](./ARCHITECTURE.md) for a deep dive into the schema layout, Hasura metadata patterns, and backend executor logic.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Running Locally
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. **Start Nhost:**
+   ```bash
+   nhost dev
+   ```
+2. **Apply Migrations and Seed Data:**
+   *(Nhost dev usually auto-applies everything in `nhost/migrations` and `nhost/metadata`. If not, run `nhost dev` and push it through the CLI).*
+3. **Environment Variables:**
+   Copy `.env.example` to `.env.local` and add your GROQ API key if you want real LLM calls instead of deterministic stubs:
+   ```bash
+   cp .env.example .env.local
+   ```
+4. **Start the Frontend & Functions:**
+   ```bash
+   npm run dev
+   # Functions run automatically on port 3000 in Nhost, but you can also run them locally if testing standalone.
+   ```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Demo Scenario
+Please see [DEMO.md](./DEMO.md) for a step-by-step walk-through of the end-to-end final task scenario validating cross-org constraints, triggers, and the approval gate.

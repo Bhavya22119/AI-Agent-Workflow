@@ -1,0 +1,8 @@
+[global]
+[hasura]
+version = "v2.33.0"
+[auth]
+version = "0.30.0"
+[storage]
+version = "0.3.3"
+[functions]

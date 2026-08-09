@@ -1,0 +1,93 @@
+table:
+  name: organizations
+  schema: public
+array_relationships:
+  - name: org_members
+    using:
+      foreign_key_constraint_on:
+        column: org_id
+        table:
+          name: org_members
+          schema: public
+  - name: workflows
+    using:
+      foreign_key_constraint_on:
+        column: org_id
+        table:
+          name: workflows
+          schema: public
+  - name: workflow_runs
+    using:
+      foreign_key_constraint_on:
+        column: org_id
+        table:
+          name: workflow_runs
+          schema: public
+select_permissions:
+  - role: owner
+    permission:
+      columns: '*'
+      filter:
+        _exists:
+          _table:
+            name: org_members
+            schema: public
+          _where:
+            _and:
+              - user_id:
+                  _eq: X-Hasura-User-Id
+              - org_id:
+                  _eq: id
+              - role:
+                  _eq: owner
+  - role: editor
+    permission:
+      columns: '*'
+      filter:
+        _exists:
+          _table:
+            name: org_members
+            schema: public
+          _where:
+            _and:
+              - user_id:
+                  _eq: X-Hasura-User-Id
+              - org_id:
+                  _eq: id
+              - role:
+                  _eq: editor
+  - role: viewer
+    permission:
+      columns: '*'
+      filter:
+        _exists:
+          _table:
+            name: org_members
+            schema: public
+          _where:
+            _and:
+              - user_id:
+                  _eq: X-Hasura-User-Id
+              - org_id:
+                  _eq: id
+              - role:
+                  _eq: viewer
+update_permissions:
+  - role: owner
+    permission:
+      columns:
+        - name
+        - quota_allowed
+      filter:
+        _exists:
+          _table:
+            name: org_members
+            schema: public
+          _where:
+            _and:
+              - user_id:
+                  _eq: X-Hasura-User-Id
+              - org_id:
+                  _eq: id
+              - role:
+                  _eq: owner

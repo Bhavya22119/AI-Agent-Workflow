@@ -1,0 +1,27 @@
+actions:
+  - name: triggerWorkflowRun
+    definition:
+      kind: synchronous
+      handler: '{{NHOST_FUNCTIONS_URL}}/v1/trigger-workflow-run'
+      forward_client_headers: true
+    permissions:
+      - role: owner
+      - role: editor
+  - name: approveStep
+    definition:
+      kind: synchronous
+      handler: '{{NHOST_FUNCTIONS_URL}}/v1/approve-step'
+      forward_client_headers: true
+    permissions:
+      - role: owner
+      - role: editor
+  - name: invokeWorkflowWebhook
+    definition:
+      kind: synchronous
+      handler: '{{NHOST_FUNCTIONS_URL}}/v1/invoke-workflow-webhook'
+    permissions: []
+custom_types:
+  input_objects: []
+  objects:
+    - name: TriggerWorkflowRunOutput
+    - name: ApproveStepOutput
