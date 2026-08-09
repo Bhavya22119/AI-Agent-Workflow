@@ -11,7 +11,7 @@ import { useGraphQL } from '@/hooks/useGraphQL';
 
 export default function NewWorkflowPage() {
   const router = useRouter();
-  const { role } = useOrg();
+  const { role, orgId } = useOrg();
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
   const [steps, setSteps] = useState<any[]>([]);
