@@ -60,6 +60,18 @@ select_permissions:
                 - role:
                     _eq: viewer
 insert_permissions:
+  - role: user
+    permission:
+      columns: '*'
+      check:
+        workflow:
+          organization:
+            org_members:
+              _and:
+                - user_id:
+                    _eq: X-Hasura-User-Id
+                - role:
+                    _in: [owner, editor]
   - role: owner
     permission:
       columns: '*'
@@ -90,6 +102,18 @@ insert_permissions:
                 - db_write
                 - notify
 update_permissions:
+  - role: user
+    permission:
+      columns: '*'
+      filter:
+        workflow:
+          organization:
+            org_members:
+              _and:
+                - user_id:
+                    _eq: X-Hasura-User-Id
+                - role:
+                    _in: [owner, editor]
   - role: owner
     permission:
       columns: '*'
@@ -120,6 +144,17 @@ update_permissions:
                 - db_write
                 - notify
 delete_permissions:
+  - role: user
+    permission:
+      filter:
+        workflow:
+          organization:
+            org_members:
+              _and:
+                - user_id:
+                    _eq: X-Hasura-User-Id
+                - role:
+                    _in: [owner, editor]
   - role: owner
     permission:
       filter:

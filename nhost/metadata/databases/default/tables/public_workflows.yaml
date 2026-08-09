@@ -34,8 +34,8 @@ select_permissions:
       filter:
         organization:
           org_members:
-              user_id:
-                _eq: X-Hasura-User-Id
+            user_id:
+              _eq: X-Hasura-User-Id
   - role: owner
     permission:
       columns: '*'
@@ -70,6 +70,17 @@ select_permissions:
               - role:
                   _eq: viewer
 insert_permissions:
+  - role: user
+    permission:
+      columns: '*'
+      check:
+        organization:
+          org_members:
+            _and:
+              - user_id:
+                  _eq: X-Hasura-User-Id
+              - role:
+                  _in: [owner, editor]
   - role: owner
     permission:
       columns: '*'
@@ -93,6 +104,17 @@ insert_permissions:
               - role:
                   _eq: editor
 update_permissions:
+  - role: user
+    permission:
+      columns: '*'
+      filter:
+        organization:
+          org_members:
+            _and:
+              - user_id:
+                  _eq: X-Hasura-User-Id
+              - role:
+                  _in: [owner, editor]
   - role: owner
     permission:
       columns: '*'
@@ -116,6 +138,16 @@ update_permissions:
               - role:
                   _eq: editor
 delete_permissions:
+  - role: user
+    permission:
+      filter:
+        organization:
+          org_members:
+            _and:
+              - user_id:
+                  _eq: X-Hasura-User-Id
+              - role:
+                  _eq: owner
   - role: owner
     permission:
       filter:
