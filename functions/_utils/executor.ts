@@ -14,7 +14,7 @@ export interface StepRun {
 
 async function updateRunStatus(id: string, status: string) {
   await adminQuery(`
-    mutation UpdateRun($id: uuid!, $status: String!) {
+    mutation UpdateRun($id: uuid!, $status: run_status!) {
       update_workflow_runs_by_pk(pk_columns: { id: $id }, _set: { status: $status }) { id }
     }
   `, { id, status });
@@ -22,7 +22,7 @@ async function updateRunStatus(id: string, status: string) {
 
 async function updateStepRunStatus(id: string, status: string, updates: any = {}) {
   await adminQuery(`
-    mutation UpdateStepRun($id: uuid!, $status: String!, $input: jsonb, $output: jsonb, $error: String) {
+    mutation UpdateStepRun($id: uuid!, $status: step_run_status!, $input: jsonb, $output: jsonb, $error: String) {
       update_step_runs_by_pk(pk_columns: { id: $id }, _set: { status: $status, input: $input, output: $output, error: $error }) { id }
     }
   `, { id, status, ...updates });
@@ -92,9 +92,6 @@ function interpolate(template: string, input: any, stepRuns: StepRun[]): string 
     key = key.trim();
     if (key === 'input') return typeof input === 'object' ? JSON.stringify(input) : String(input);
     if (key === 'prev_output') return typeof input === 'object' ? JSON.stringify(input) : String(input);
-    if (key.startsWith('step_') && key.endsWith('_output')) {
-       return match;
-    }
     return match;
   });
 }

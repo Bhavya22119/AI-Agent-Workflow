@@ -11,7 +11,7 @@ export async function verifyOrgMembership(
   requiredRoles: string[] = ['owner', 'editor']
 ): Promise<{ role: string } | null> {
   const data = await adminQuery(`
-    query VerifyMembership($userId: uuid!, $orgId: uuid!, $roles: [String!]!) {
+    query VerifyMembership($userId: uuid!, $orgId: uuid!, $roles: [org_role!]!) {
       org_members(where: {
         user_id: { _eq: $userId },
         org_id: { _eq: $orgId },

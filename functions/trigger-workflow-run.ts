@@ -6,8 +6,8 @@ import { executeWorkflow } from './_utils/executor';
 export default async function handler(req: Request, res: Response) {
   try {
     const { session_variables, input } = req.body;
-    const userId = session_variables['x-hasura-user-id'];
-    const workflowId = input.workflow_id;
+    const userId = session_variables?.['x-hasura-user-id'];
+    const workflowId = input?.workflow_id;
     
     if (!userId) return res.status(400).json({ message: 'Not authenticated' });
     if (!workflowId) return res.status(400).json({ message: 'workflow_id is required' });
@@ -26,7 +26,7 @@ export default async function handler(req: Request, res: Response) {
         insert_workflow_runs_one(object: {
           workflow_id: $workflowId,
           org_id: $orgId,
-          status: "pending",
+          status: pending,
           started_by: $startedBy
         }) {
           id
@@ -66,8 +66,8 @@ export default async function handler(req: Request, res: Response) {
     executeWorkflow(workflowRun.id).catch(err => console.error(err));
     
     return res.json({ workflow_run_id: workflowRun.id, status: 'pending' });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: 'Internal server error' });
+  } catch (error: any) {
+    console.error('trigger-workflow-run error:', error);
+    return res.status(500).json({ message: error.message || 'Internal server error' });
   }
 }
