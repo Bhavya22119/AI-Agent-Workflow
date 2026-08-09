@@ -13,28 +13,21 @@ select_permissions:
     permission:
       columns: '*'
       filter:
-        _exists:
-          _table:
-            name: org_members
-            schema: public
-          _where:
-            user_id:
-              _eq: X-Hasura-User-Id
+        workflow_run:
+          organization:
+            org_members:
+              user_id:
+                _eq: X-Hasura-User-Id
   - role: owner
     permission:
       columns: '*'
       filter:
         workflow_run:
-          _exists:
-            _table:
-              name: org_members
-              schema: public
-            _where:
+          organization:
+            org_members:
               _and:
                 - user_id:
                     _eq: X-Hasura-User-Id
-                - org_id:
-                    _eq: org_id
                 - role:
                     _eq: owner
   - role: editor
@@ -42,16 +35,11 @@ select_permissions:
       columns: '*'
       filter:
         workflow_run:
-          _exists:
-            _table:
-              name: org_members
-              schema: public
-            _where:
+          organization:
+            org_members:
               _and:
                 - user_id:
                     _eq: X-Hasura-User-Id
-                - org_id:
-                    _eq: org_id
                 - role:
                     _eq: editor
   - role: viewer
@@ -59,15 +47,10 @@ select_permissions:
       columns: '*'
       filter:
         workflow_run:
-          _exists:
-            _table:
-              name: org_members
-              schema: public
-            _where:
+          organization:
+            org_members:
               _and:
                 - user_id:
                     _eq: X-Hasura-User-Id
-                - org_id:
-                    _eq: org_id
                 - role:
                     _eq: viewer

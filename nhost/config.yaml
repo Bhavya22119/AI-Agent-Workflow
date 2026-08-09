@@ -1,0 +1,3 @@
+version: 3
+endpoint: https://osouykwsxrtvrkapwnwp.hasura.ap-south-1.nhost.run
+metadata_directory: metadata

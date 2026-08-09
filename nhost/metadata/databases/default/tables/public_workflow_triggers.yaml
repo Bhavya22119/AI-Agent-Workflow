@@ -10,28 +10,21 @@ select_permissions:
     permission:
       columns: '*'
       filter:
-        _exists:
-          _table:
-            name: org_members
-            schema: public
-          _where:
-            user_id:
-              _eq: X-Hasura-User-Id
+        workflow:
+          organization:
+            org_members:
+              user_id:
+                _eq: X-Hasura-User-Id
   - role: owner
     permission:
       columns: '*'
       filter:
         workflow:
-          _exists:
-            _table:
-              name: org_members
-              schema: public
-            _where:
+          organization:
+            org_members:
               _and:
                 - user_id:
                     _eq: X-Hasura-User-Id
-                - org_id:
-                    _eq: org_id
                 - role:
                     _eq: owner
   - role: editor
@@ -39,16 +32,11 @@ select_permissions:
       columns: '*'
       filter:
         workflow:
-          _exists:
-            _table:
-              name: org_members
-              schema: public
-            _where:
+          organization:
+            org_members:
               _and:
                 - user_id:
                     _eq: X-Hasura-User-Id
-                - org_id:
-                    _eq: org_id
                 - role:
                     _eq: editor
   - role: viewer
@@ -56,16 +44,11 @@ select_permissions:
       columns: '*'
       filter:
         workflow:
-          _exists:
-            _table:
-              name: org_members
-              schema: public
-            _where:
+          organization:
+            org_members:
               _and:
                 - user_id:
                     _eq: X-Hasura-User-Id
-                - org_id:
-                    _eq: org_id
                 - role:
                     _eq: viewer
 insert_permissions:
@@ -74,16 +57,11 @@ insert_permissions:
       columns: '*'
       check:
         workflow:
-          _exists:
-            _table:
-              name: org_members
-              schema: public
-            _where:
+          organization:
+            org_members:
               _and:
                 - user_id:
                     _eq: X-Hasura-User-Id
-                - org_id:
-                    _eq: org_id
                 - role:
                     _eq: owner
   - role: editor
@@ -91,37 +69,27 @@ insert_permissions:
       columns: '*'
       check:
         _and:
-          - type:
-              _neq: "webhook"
           - workflow:
-              _exists:
-                _table:
-                  name: org_members
-                  schema: public
-                _where:
+              organization:
+                org_members:
                   _and:
                     - user_id:
                         _eq: X-Hasura-User-Id
-                    - org_id:
-                        _eq: org_id
                     - role:
                         _eq: editor
+          - type:
+              _neq: webhook
 update_permissions:
   - role: owner
     permission:
       columns: '*'
       filter:
         workflow:
-          _exists:
-            _table:
-              name: org_members
-              schema: public
-            _where:
+          organization:
+            org_members:
               _and:
                 - user_id:
                     _eq: X-Hasura-User-Id
-                - org_id:
-                    _eq: org_id
                 - role:
                     _eq: owner
   - role: editor
@@ -129,16 +97,11 @@ update_permissions:
       columns: '*'
       filter:
         workflow:
-          _exists:
-            _table:
-              name: org_members
-              schema: public
-            _where:
+          organization:
+            org_members:
               _and:
                 - user_id:
                     _eq: X-Hasura-User-Id
-                - org_id:
-                    _eq: org_id
                 - role:
                     _eq: editor
 delete_permissions:
@@ -146,31 +109,21 @@ delete_permissions:
     permission:
       filter:
         workflow:
-          _exists:
-            _table:
-              name: org_members
-              schema: public
-            _where:
+          organization:
+            org_members:
               _and:
                 - user_id:
                     _eq: X-Hasura-User-Id
-                - org_id:
-                    _eq: org_id
                 - role:
                     _eq: owner
   - role: editor
     permission:
       filter:
         workflow:
-          _exists:
-            _table:
-              name: org_members
-              schema: public
-            _where:
+          organization:
+            org_members:
               _and:
                 - user_id:
                     _eq: X-Hasura-User-Id
-                - org_id:
-                    _eq: org_id
                 - role:
                     _eq: editor
