@@ -2,7 +2,7 @@ actions:
   - name: triggerWorkflowRun
     definition:
       kind: synchronous
-      handler: '{{NHOST_FUNCTIONS_URL}}/v1/trigger-workflow-run'
+      handler: '{{NHOST_FUNCTIONS_URL}}/trigger-workflow-run'
       forward_client_headers: true
     permissions:
       - role: owner
@@ -10,7 +10,7 @@ actions:
   - name: approveStep
     definition:
       kind: synchronous
-      handler: '{{NHOST_FUNCTIONS_URL}}/v1/approve-step'
+      handler: '{{NHOST_FUNCTIONS_URL}}/approve-step'
       forward_client_headers: true
     permissions:
       - role: owner
@@ -18,7 +18,7 @@ actions:
   - name: invokeWorkflowWebhook
     definition:
       kind: synchronous
-      handler: '{{NHOST_FUNCTIONS_URL}}/v1/invoke-workflow-webhook'
+      handler: '{{NHOST_FUNCTIONS_URL}}/invoke-workflow-webhook'
     permissions: []
 custom_types:
   input_objects: []

@@ -112,4 +112,4 @@ event_triggers:
       interval_sec: 10
       num_retries: 0
       timeout_sec: 60
-    webhook: '{{NHOST_FUNCTIONS_URL}}/v1/handle-notify'
+    webhook: '{{NHOST_FUNCTIONS_URL}}/handle-notify'
