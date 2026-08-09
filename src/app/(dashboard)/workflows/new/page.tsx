@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import { useOrg } from '@/hooks/useOrg';
+import { useGraphQL } from '@/hooks/useGraphQL';
 
 export default function NewWorkflowPage() {
   const router = useRouter();
@@ -15,20 +16,58 @@ export default function NewWorkflowPage() {
   const [desc, setDesc] = useState('');
   const [steps, setSteps] = useState<any[]>([]);
 
+  const { request } = useGraphQL();
+  const [loading, setLoading] = useState(false);
+
   const addStep = (type: string) => {
     setSteps([...steps, { id: Date.now(), type, config: {} }]);
   };
 
-  const handleSave = () => {
-    // Implement save logic via GraphQL
-    router.push('/workflows');
+  const updateStepConfig = (id: number, configUpdate: any) => {
+    setSteps(steps.map(s => s.id === id ? { ...s, config: { ...s.config, ...configUpdate } } : s));
+  };
+
+  const handleSave = async () => {
+    if (!name || !orgId) return alert('Name and Organization required.');
+    setLoading(true);
+    
+    try {
+      const formattedSteps = steps.map((s, idx) => ({
+        position: idx + 1,
+        type: s.type,
+        config: s.config
+      }));
+
+      // We use insert_workflows_one to insert workflow and nested workflow_steps together
+      await request(`
+        mutation CreateWorkflow($orgId: uuid!, $name: String!, $desc: String, $steps: [workflow_steps_insert_input!]!) {
+          insert_workflows_one(object: {
+            org_id: $orgId,
+            name: $name,
+            description: $desc,
+            workflow_steps: {
+              data: $steps
+            }
+          }) {
+            id
+          }
+        }
+      `, { orgId, name, desc, steps: formattedSteps });
+
+      router.push('/workflows');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save workflow.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-12">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-white">Create Workflow</h1>
-        <Button onClick={handleSave}>Save Workflow</Button>
+        <Button onClick={handleSave} disabled={loading}>{loading ? 'Saving...' : 'Save Workflow'}</Button>
       </div>
 
       <Card className="space-y-4">
@@ -77,16 +116,52 @@ export default function NewWorkflowPage() {
               
               <div className="space-y-3">
                 {step.type === 'llm_call' && (
-                  <Textarea placeholder="Prompt template..." />
+                  <>
+                    <Textarea 
+                      placeholder="Prompt template..." 
+                      value={step.config.prompt || ''} 
+                      onChange={e => updateStepConfig(step.id, { prompt: e.target.value })} 
+                    />
+                    <Input 
+                      placeholder="Model (e.g. llama3-8b-8192)" 
+                      value={step.config.model || ''} 
+                      onChange={e => updateStepConfig(step.id, { model: e.target.value })} 
+                    />
+                  </>
                 )}
                 {step.type === 'http_request' && (
                   <>
-                    <Input placeholder="URL" />
-                    <Select><option>GET</option><option>POST</option></Select>
+                    <Input 
+                      placeholder="URL" 
+                      value={step.config.url || ''} 
+                      onChange={e => updateStepConfig(step.id, { url: e.target.value })} 
+                    />
+                    <Select onChange={e => updateStepConfig(step.id, { method: e.target.value })}>
+                      <option value="GET">GET</option>
+                      <option value="POST">POST</option>
+                    </Select>
                   </>
                 )}
                 {step.type === 'approval_gate' && (
-                  <Textarea placeholder="Message for approver..." />
+                  <Textarea 
+                    placeholder="Message for approver..." 
+                    value={step.config.message || ''} 
+                    onChange={e => updateStepConfig(step.id, { message: e.target.value })} 
+                  />
+                )}
+                {step.type === 'db_write' && (
+                  <>
+                    <Input 
+                      placeholder="Output Key" 
+                      value={step.config.key || ''} 
+                      onChange={e => updateStepConfig(step.id, { key: e.target.value })} 
+                    />
+                    <Input 
+                      placeholder="Value Template (e.g. {{prev_output}})" 
+                      value={step.config.value_template || ''} 
+                      onChange={e => updateStepConfig(step.id, { value_template: e.target.value })} 
+                    />
+                  </>
                 )}
               </div>
             </div>

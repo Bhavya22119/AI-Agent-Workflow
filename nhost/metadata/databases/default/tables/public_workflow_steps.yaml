@@ -14,6 +14,17 @@ array_relationships:
           name: step_runs
           schema: public
 select_permissions:
+  - role: user
+    permission:
+      columns: '*'
+      filter:
+        _exists:
+          _table:
+            name: org_members
+            schema: public
+          _where:
+            user_id:
+              _eq: X-Hasura-User-Id
   - role: owner
     permission:
       columns: '*'

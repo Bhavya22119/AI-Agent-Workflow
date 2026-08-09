@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 :root {
   --foreground-rgb: 248, 250, 252;
@@ -19,10 +17,8 @@ body {
   min-height: 100vh;
 }
 
-@layer utilities {
-  .glass {
-    @apply bg-slate-900/60 backdrop-blur-md border border-slate-700/50 shadow-xl;
-  }
+@utility glass {
+  @apply bg-slate-900/60 backdrop-blur-md border border-slate-700/50 shadow-xl;
 }
 
 @keyframes pulse-ring {
