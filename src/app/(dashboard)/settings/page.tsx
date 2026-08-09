@@ -59,35 +59,46 @@ export default function SettingsPage() {
       return;
     }
 
+    let isMounted = true;
+
     const fetchData = async () => {
       try {
-        setLoading(true);
         const data = await request<{
           org_usage_summary: OrgUsageSummary[];
           org_members: OrgMember[];
         }>(QUERY, { orgId });
 
-        if (data.org_usage_summary && data.org_usage_summary.length > 0) {
-          setSummary(data.org_usage_summary[0]);
-        }
-        if (data.org_members) {
-          setMembers(data.org_members);
+        if (isMounted) {
+          if (data.org_usage_summary && data.org_usage_summary.length > 0) {
+            setSummary(data.org_usage_summary[0]);
+          }
+          if (data.org_members) {
+            setMembers(data.org_members);
+          }
         }
       } catch (err: any) {
-        setError(err.message || "Failed to load organization settings.");
+        if (isMounted) {
+          setError(err.message || "Failed to load organization settings.");
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchData();
-  }, [orgId, orgLoading, request]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [orgId, orgLoading]);
 
   const getRoleStatus = (r: string): RunStatus | undefined => {
     switch (r) {
-      case 'owner': return 'completed'; // green
-      case 'editor': return 'running'; // blue
-      case 'viewer': return 'pending'; // slate
+      case 'owner': return 'completed';
+      case 'editor': return 'running';
+      case 'viewer': return 'pending';
       default: return undefined;
     }
   };

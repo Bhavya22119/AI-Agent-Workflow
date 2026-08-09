@@ -1,10 +1,11 @@
+import { useCallback } from 'react';
 import { useAccessToken } from '@nhost/react';
 import { nhost } from '@/lib/nhost';
 
 export function useGraphQL() {
   const accessToken = useAccessToken();
 
-  const request = async <T = any>(query: string, variables?: Record<string, any>): Promise<T> => {
+  const request = useCallback(async <T = any>(query: string, variables?: Record<string, any>): Promise<T> => {
     const response = await fetch(nhost.graphql.httpUrl, {
       method: 'POST',
       headers: {
@@ -22,7 +23,7 @@ export function useGraphQL() {
     }
     
     return json.data as T;
-  };
+  }, [accessToken]);
 
   return { request };
 }
