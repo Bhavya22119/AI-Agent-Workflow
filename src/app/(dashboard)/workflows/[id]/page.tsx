@@ -29,7 +29,7 @@ export default function WorkflowDetailPage() {
   const router = useRouter();
   const id = params.id as string;
   const { request } = useGraphQL();
-  const { role } = useOrg();
+  const { role, orgId } = useOrg();
   
   const [workflow, setWorkflow] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -42,6 +42,7 @@ export default function WorkflowDetailPage() {
           query GetWorkflow($id: uuid!) {
             workflows_by_pk(id: $id) {
               id
+              org_id
               name
               description
               created_at
@@ -78,6 +79,9 @@ export default function WorkflowDetailPage() {
 
   const handleRun = async () => {
     setTriggering(true);
+    let runId: string | null = null;
+
+    // 1. Try triggering via Hasura Action
     try {
       const data = await request(`
         mutation TriggerRun($id: uuid!) {
@@ -87,15 +91,58 @@ export default function WorkflowDetailPage() {
           }
         }
       `, { id });
-      
-      const runId = data.triggerWorkflowRun.workflow_run_id;
-      if (runId) {
-        router.push(`/workflows/${id}/runs/${runId}`);
+      runId = data?.triggerWorkflowRun?.workflow_run_id;
+    } catch (actionErr) {
+      console.warn('Action trigger failed, falling back to direct GraphQL run creation:', actionErr);
+    }
+
+    // 2. Direct Fallback if Hasura Action serverless function is not active
+    if (!runId && workflow) {
+      try {
+        const targetOrgId = workflow.org_id || orgId;
+        const runRes = await request(`
+          mutation CreateRunDirect($workflowId: uuid!, $orgId: uuid!) {
+            insert_workflow_runs_one(object: {
+              workflow_id: $workflowId,
+              org_id: $orgId,
+              status: pending
+            }) {
+              id
+              status
+            }
+          }
+        `, { workflowId: id, orgId: targetOrgId });
+
+        runId = runRes.insert_workflow_runs_one.id;
+
+        if (runId && workflow.workflow_steps?.length > 0) {
+          const stepRunObjects = workflow.workflow_steps.map((step: any) => ({
+            workflow_run_id: runId,
+            workflow_step_id: step.id,
+            position: step.position,
+            status: 'pending',
+          }));
+
+          await request(`
+            mutation CreateStepRunsDirect($objects: [step_runs_insert_input!]!) {
+              insert_step_runs(objects: $objects) {
+                affected_rows
+              }
+            }
+          `, { objects: stepRunObjects });
+        }
+      } catch (directErr) {
+        console.error('Direct run creation failed:', directErr);
+        alert('Failed to trigger workflow');
+        setTriggering(false);
+        return;
       }
-    } catch (err) {
-      console.error(err);
+    }
+
+    if (runId) {
+      router.push(`/workflows/${id}/runs/${runId}`);
+    } else {
       alert('Failed to trigger workflow');
-    } finally {
       setTriggering(false);
     }
   };
