@@ -1,4 +1,4 @@
-import { NhostClient } from '@nhost/nextjs';
+import { NhostClient } from '@nhost/react';
 
 const nhost = new NhostClient({
   subdomain: process.env.NEXT_PUBLIC_NHOST_SUBDOMAIN || 'local',
