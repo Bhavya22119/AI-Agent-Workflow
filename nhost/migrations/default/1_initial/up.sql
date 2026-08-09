@@ -117,10 +117,10 @@ SELECT
     o.id as org_id,
     o.name,
     o.quota_allowed,
-    o.quota_used,
+    (SELECT COUNT(*)::integer FROM workflow_runs wr WHERE wr.org_id = o.id) as quota_used,
     o.usage_period_start,
-    (o.quota_allowed - o.quota_used) as quota_remaining,
-    ROUND((o.quota_used::numeric / NULLIF(o.quota_allowed, 0)::numeric) * 100, 2) as usage_percentage,
+    (o.quota_allowed - (SELECT COUNT(*)::integer FROM workflow_runs wr WHERE wr.org_id = o.id)) as quota_remaining,
+    ROUND(((SELECT COUNT(*)::numeric FROM workflow_runs wr WHERE wr.org_id = o.id) / NULLIF(o.quota_allowed, 0)::numeric) * 100, 2) as usage_percentage,
     (SELECT COUNT(*) FROM workflow_runs wr WHERE wr.org_id = o.id) as total_runs,
     (SELECT COUNT(*) FROM workflows w WHERE w.org_id = o.id) as total_workflows
 FROM organizations o;
