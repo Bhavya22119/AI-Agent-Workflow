@@ -24,4 +24,14 @@ custom_types:
   input_objects: []
   objects:
     - name: TriggerWorkflowRunOutput
+      fields:
+        - name: workflow_run_id
+          type: uuid!
+        - name: status
+          type: String!
     - name: ApproveStepOutput
+      fields:
+        - name: workflow_run_id
+          type: uuid!
+        - name: status
+          type: String!

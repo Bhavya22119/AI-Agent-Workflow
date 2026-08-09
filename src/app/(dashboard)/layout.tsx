@@ -3,30 +3,37 @@ import { useAuthenticationStatus, useSignOut } from '@nhost/react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { nhost } from '@/lib/nhost';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuthenticationStatus();
   const router = useRouter();
   const pathname = usePathname();
   const { signOut } = useSignOut();
-
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  const [isAuthResolved, setIsAuthResolved] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    if (isMounted && !isLoading && !isAuthenticated) {
-      // Add a small debounce to allow Nhost to read localStorage
-      const timer = setTimeout(() => {
-        router.push('/login');
-      }, 50);
-      return () => clearTimeout(timer);
+    let mounted = true;
+    
+    async function checkAuth() {
+      // Wait for Nhost to finish its initial token check from localStorage
+      const isAuth = await nhost.auth.isAuthenticatedAsync();
+      if (mounted) {
+        setIsAuthenticated(isAuth);
+        setIsAuthResolved(true);
+        if (!isAuth) {
+          router.push('/login');
+        }
+      }
     }
-  }, [isAuthenticated, isLoading, router, isMounted]);
+    
+    checkAuth();
+    
+    return () => { mounted = false; };
+  }, [router]);
 
-  if (!isMounted || isLoading || !isAuthenticated) return <div className="p-8 text-center text-slate-400">Loading workspace...</div>;
+  if (!isAuthResolved) return <div className="p-8 text-center text-slate-400">Loading workspace...</div>;
+  if (!isAuthenticated) return null; // Wait for redirect
 
   const navItems = [
     { name: 'Overview', path: '/dashboard' },
