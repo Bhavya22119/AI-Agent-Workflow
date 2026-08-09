@@ -1,18 +1,28 @@
 "use client";
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuthenticationStatus } from '@nhost/react';
+import { nhost } from '@/lib/nhost';
 
 export default function HomePage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading } = useAuthenticationStatus();
+  const [isAuthResolved, setIsAuthResolved] = useState(false);
 
   useEffect(() => {
-    if (!isLoading) {
-      if (isAuthenticated) router.push('/workflows');
-      else router.push('/login');
+    let mounted = true;
+    
+    async function checkAuth() {
+      const isAuth = await nhost.auth.isAuthenticatedAsync();
+      if (mounted) {
+        setIsAuthResolved(true);
+        if (isAuth) router.push('/workflows');
+        else router.push('/login');
+      }
     }
-  }, [isAuthenticated, isLoading, router]);
+    
+    checkAuth();
+    
+    return () => { mounted = false; };
+  }, [router]);
 
-  return <div className="flex h-screen items-center justify-center">Loading...</div>;
+  return <div className="flex h-screen items-center justify-center text-slate-400">Loading...</div>;
 }
