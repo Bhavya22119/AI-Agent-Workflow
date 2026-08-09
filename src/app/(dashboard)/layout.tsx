@@ -2,7 +2,7 @@
 import { useAuthenticationStatus, useSignOut } from '@nhost/react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthenticationStatus();
@@ -10,11 +10,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const { signOut } = useSignOut();
 
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) router.push('/login');
-  }, [isAuthenticated, isLoading, router]);
+  const [isMounted, setIsMounted] = useState(false);
 
-  if (isLoading || !isAuthenticated) return <div className="p-8 text-center">Loading...</div>;
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (isMounted && !isLoading && !isAuthenticated) {
+      // Add a small debounce to allow Nhost to read localStorage
+      const timer = setTimeout(() => {
+        router.push('/login');
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthenticated, isLoading, router, isMounted]);
+
+  if (!isMounted || isLoading || !isAuthenticated) return <div className="p-8 text-center text-slate-400">Loading workspace...</div>;
 
   const navItems = [
     { name: 'Overview', path: '/dashboard' },
