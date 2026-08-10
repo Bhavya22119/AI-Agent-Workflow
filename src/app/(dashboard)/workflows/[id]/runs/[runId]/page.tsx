@@ -8,6 +8,7 @@ import { useGraphQL } from '@/hooks/useGraphQL';
 import { useAccessToken } from '@nhost/react';
 import { nhost } from '@/lib/nhost';
 import { createClient } from 'graphql-ws';
+import { useOrg } from '@/hooks/useOrg';
 
 // ───────── GraphQL operations ─────────
 
@@ -89,6 +90,7 @@ export default function WorkflowRunPage() {
   const runId = params.runId as string;
   const { request } = useGraphQL();
   const accessToken = useAccessToken();
+  const { role } = useOrg();
   
   const [run, setRun] = useState<any>(null);
   const [steps, setSteps] = useState<any[]>([]);
@@ -408,13 +410,15 @@ export default function WorkflowRunPage() {
                           <p className="text-amber-400/70 text-xs mt-1">{step.workflow_step.config.message}</p>
                         )}
                       </div>
-                      <Button 
-                        className="bg-amber-500 hover:bg-amber-600 text-white border-none shadow-lg shadow-amber-500/20"
-                        onClick={() => handleApprove(step.id)}
-                        disabled={approving}
-                      >
-                        {approving ? 'Approving...' : '✅ Approve & Continue'}
-                      </Button>
+                      {role !== 'viewer' && (
+                        <Button 
+                          className="bg-amber-500 hover:bg-amber-600 text-white border-none shadow-lg shadow-amber-500/20"
+                          onClick={() => handleApprove(step.id)}
+                          disabled={approving}
+                        >
+                          {approving ? 'Approving...' : '✅ Approve & Continue'}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 )}
