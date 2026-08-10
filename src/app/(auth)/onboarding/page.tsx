@@ -177,7 +177,7 @@ export default function OnboardingPage() {
             {step === 2 && (
               <Button 
                 type="button" 
-                variant="outline"
+                variant="secondary"
                 className="w-full h-11 text-base font-medium" 
                 onClick={() => setStep(1)}
               >
