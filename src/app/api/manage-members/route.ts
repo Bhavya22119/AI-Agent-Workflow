@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
       
       // Ensure we don't accidentally update members from other orgs
       await adminQuery(`
-        mutation($id: uuid!, $orgId: uuid!, $role: String!) {
+        mutation($id: uuid!, $orgId: uuid!, $role: org_role!) {
           update_org_members(where: { id: { _eq: $id }, org_id: { _eq: $orgId } }, _set: { role: $role }) { affected_rows }
         }
       `, { id: targetMemberId, orgId, role: newRole });
