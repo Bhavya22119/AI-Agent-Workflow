@@ -115,18 +115,18 @@ export default function NewWorkflowPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-12">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-white">Create Workflow</h1>
+        <h1 className="text-3xl font-bold text-zinc-900">Create Workflow</h1>
         <Button onClick={handleSave} disabled={loading}>{loading ? 'Saving...' : 'Save Workflow'}</Button>
       </div>
 
       <Card className="space-y-4">
         <h2 className="text-xl font-semibold">General</h2>
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1">Name</label>
+          <label className="block text-sm font-medium text-zinc-600 mb-1">Name</label>
           <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Weekly Report Generator" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1">Description</label>
+          <label className="block text-sm font-medium text-zinc-600 mb-1">Description</label>
           <Textarea value={desc} onChange={e => setDesc(e.target.value)} />
         </div>
       </Card>
@@ -134,7 +134,7 @@ export default function NewWorkflowPage() {
       <Card className="space-y-4">
         <h2 className="text-xl font-semibold">Triggers</h2>
         <div className="space-y-3">
-          <label className="flex items-center space-x-2 text-slate-300">
+          <label className="flex items-center space-x-2 text-zinc-600">
             <input 
               type="checkbox" 
               checked={triggers.manual} 
@@ -145,7 +145,7 @@ export default function NewWorkflowPage() {
           
           {role === 'owner' && (
             <div className="space-y-2">
-              <label className="flex items-center space-x-2 text-slate-300">
+              <label className="flex items-center space-x-2 text-zinc-600">
                 <input 
                   type="checkbox" 
                   checked={triggers.webhook} 
@@ -166,7 +166,7 @@ export default function NewWorkflowPage() {
           )}
 
           <div className="space-y-2">
-            <label className="flex items-center space-x-2 text-slate-300">
+            <label className="flex items-center space-x-2 text-zinc-600">
               <input 
                 type="checkbox" 
                 checked={triggers.scheduled} 
@@ -185,7 +185,7 @@ export default function NewWorkflowPage() {
             )}
           </div>
 
-          <label className="flex items-center space-x-2 text-slate-300">
+          <label className="flex items-center space-x-2 text-zinc-600">
             <input 
               type="checkbox" 
               checked={triggers.database_event} 
@@ -212,35 +212,35 @@ export default function NewWorkflowPage() {
 
         <div className="space-y-4">
           {steps.map((step, idx) => (
-            <div key={step.id} className="p-4 bg-slate-800/50 border border-slate-700 rounded-lg relative group">
+            <div key={step.id} className="p-4 bg-zinc-100/50 border border-zinc-200 rounded-lg relative group">
               <div className="absolute top-4 right-4 flex space-x-2">
                 <button 
                   onClick={() => moveStepUp(idx)}
                   disabled={idx === 0}
-                  className="text-slate-500 hover:text-white disabled:opacity-30 transition-colors"
+                  className="text-zinc-500 hover:text-zinc-900 disabled:opacity-30 transition-colors"
                 >
                   ↑
                 </button>
                 <button 
                   onClick={() => moveStepDown(idx)}
                   disabled={idx === steps.length - 1}
-                  className="text-slate-500 hover:text-white disabled:opacity-30 transition-colors"
+                  className="text-zinc-500 hover:text-zinc-900 disabled:opacity-30 transition-colors"
                 >
                   ↓
                 </button>
                 <button 
                   onClick={() => setSteps(steps.filter(s => s.id !== step.id))}
-                  className="text-slate-500 hover:text-rose-500 transition-colors ml-2"
+                  className="text-zinc-500 hover:text-rose-600 transition-colors ml-2"
                 >
                   ✕
                 </button>
               </div>
               
               <div className="flex items-center space-x-3 mb-4">
-                <span className="w-6 h-6 flex items-center justify-center bg-indigo-500/20 text-indigo-400 rounded-full text-xs font-bold">
+                <span className="w-6 h-6 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-full text-xs font-bold">
                   {idx + 1}
                 </span>
-                <span className="text-sm font-medium text-white px-2 py-1 bg-slate-700 rounded">
+                <span className="text-sm font-medium text-zinc-900 px-2 py-1 bg-zinc-200 rounded">
                   {step.type}
                 </span>
               </div>
@@ -351,7 +351,7 @@ export default function NewWorkflowPage() {
             </div>
           ))}
           {steps.length === 0 && (
-            <div className="text-center py-8 text-slate-500 italic">No steps added yet.</div>
+            <div className="text-center py-8 text-zinc-500 italic">No steps added yet.</div>
           )}
         </div>
       </Card>

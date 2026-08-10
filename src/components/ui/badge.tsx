@@ -2,13 +2,13 @@ import React from 'react';
 import { RunStatus } from '@/lib/types';
 
 const statusColors: Record<RunStatus | 'default', string> = {
-  pending: 'bg-slate-500/20 text-slate-400 border border-slate-500/30',
-  running: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
-  paused: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
-  completed: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
-  failed: 'bg-rose-500/20 text-rose-400 border border-rose-500/30',
-  skipped: 'bg-slate-500/20 text-slate-500 border border-slate-500/30 line-through',
-  default: 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30',
+  pending: 'bg-zinc-100 text-zinc-600 border border-zinc-200',
+  running: 'bg-blue-50 text-blue-700 border border-blue-200',
+  paused: 'bg-amber-50 text-amber-700 border border-amber-200',
+  completed: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+  failed: 'bg-rose-50 text-rose-700 border border-rose-200',
+  skipped: 'bg-zinc-100 text-zinc-500 border border-zinc-200 line-through',
+  default: 'bg-indigo-50 text-indigo-700 border border-indigo-200',
 };
 
 export function Badge({ status, label, className = '' }: { status?: RunStatus, label: string, className?: string }) {

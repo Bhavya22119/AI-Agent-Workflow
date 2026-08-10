@@ -247,14 +247,6 @@ function MainContent({ className }: { className?: string }) {
 
       <div className="relative -ml-4 lg:ml-0">
         <div className="absolute -top-2 right-0 z-1 block h-10 w-20 bg-transparent mask-[linear-gradient(to_left,white,transparent)] lg:hidden" />
-
-        <div className="no-scrollbar flex items-center gap-4 overflow-x-auto px-4 lg:px-0">
-          <TechItem icon={<NodeJSIcon />} title="Node.js" />
-          <TechItem icon={<LaravelIcon />} title="Laravel" />
-          <TechItem icon={<NextJSIcon />} title="Next.js" />
-          <TechItem icon={<ReactIcon />} title="React" />
-          <TechItem icon={<TailwindCSSIcon />} title="Tailwind CSS" />
-        </div>
       </div>
     </div>
   )

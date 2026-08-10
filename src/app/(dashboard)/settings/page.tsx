@@ -110,7 +110,7 @@ export default function SettingsPage() {
   };
 
   if (orgLoading || loading) {
-    return <div className="p-8 text-slate-400">Loading settings...</div>;
+    return <div className="p-8 text-zinc-500">Loading settings...</div>;
   }
 
   if (error) {
@@ -119,41 +119,41 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-4xl space-y-6">
-      <h1 className="text-3xl font-bold text-white mb-8">Organization Settings</h1>
+      <h1 className="text-3xl font-bold text-zinc-900 mb-8">Organization Settings</h1>
       
       <Card>
-        <h2 className="text-xl font-bold text-white mb-6">Organization Details</h2>
+        <h2 className="text-xl font-bold text-zinc-900 mb-6">Organization Details</h2>
         {summary ? (
           <div className="space-y-6">
             <div>
-              <p className="text-sm text-slate-400 mb-1">Organization Name</p>
-              <p className="text-lg font-medium text-white">{summary.name}</p>
+              <p className="text-sm text-zinc-500 mb-1">Organization Name</p>
+              <p className="text-lg font-medium text-zinc-900">{summary.name}</p>
             </div>
             
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
-                <p className="text-sm text-slate-400 mb-1">Total Workflows</p>
-                <p className="text-2xl font-bold text-white">{summary.total_workflows}</p>
+              <div className="bg-zinc-100/50 rounded-lg p-4 border border-zinc-200/50">
+                <p className="text-sm text-zinc-500 mb-1">Total Workflows</p>
+                <p className="text-2xl font-bold text-zinc-900">{summary.total_workflows}</p>
               </div>
-              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
-                <p className="text-sm text-slate-400 mb-1">Total Runs</p>
-                <p className="text-2xl font-bold text-white">{summary.total_runs}</p>
+              <div className="bg-zinc-100/50 rounded-lg p-4 border border-zinc-200/50">
+                <p className="text-sm text-zinc-500 mb-1">Total Runs</p>
+                <p className="text-2xl font-bold text-zinc-900">{summary.total_runs}</p>
               </div>
             </div>
 
             <div>
               <div className="flex justify-between items-end mb-2">
                 <div>
-                  <p className="text-sm text-slate-400">Usage Quota</p>
-                  <p className="text-sm font-medium text-white">
+                  <p className="text-sm text-zinc-500">Usage Quota</p>
+                  <p className="text-sm font-medium text-zinc-900">
                     {summary.quota_used} / {summary.quota_allowed} runs used
                   </p>
                 </div>
-                <span className="text-sm font-bold text-indigo-400">
+                <span className="text-sm font-bold text-indigo-600">
                   {Math.round(summary.usage_percentage)}%
                 </span>
               </div>
-              <div className="w-full bg-slate-800 rounded-full h-2.5">
+              <div className="w-full bg-zinc-100 rounded-full h-2.5">
                 <div 
                   className="bg-indigo-500 h-2.5 rounded-full transition-all duration-500" 
                   style={{ width: `${Math.min(100, Math.max(0, summary.usage_percentage))}%` }}
@@ -162,34 +162,34 @@ export default function SettingsPage() {
             </div>
           </div>
         ) : (
-          <p className="text-slate-400">Organization details not available.</p>
+          <p className="text-zinc-500">Organization details not available.</p>
         )}
       </Card>
 
       <Card>
-        <h2 className="text-xl font-bold text-white mb-4">Members</h2>
-        <p className="text-sm text-slate-400 mb-6">
+        <h2 className="text-xl font-bold text-zinc-900 mb-4">Members</h2>
+        <p className="text-sm text-zinc-500 mb-6">
           People with access to {summary?.name || 'this organization'}.
         </p>
         
           {role === 'owner' && (
             <div className="mb-6 bg-indigo-500/10 border border-indigo-500/20 rounded-lg p-4 flex justify-between items-center">
-              <p className="text-sm text-indigo-300">
-                <span className="font-semibold text-indigo-200">Owner Access:</span> You can change member roles below.
+              <p className="text-sm text-indigo-700">
+                <span className="font-semibold text-indigo-800">Owner Access:</span> You can change member roles below.
               </p>
             </div>
           )}
 
           <div className="space-y-3">
             {members.map((member) => (
-              <div key={member.id} className="flex items-center justify-between p-4 rounded-lg bg-slate-800/30 border border-slate-700/50 hover:bg-slate-800/50 transition-colors">
+              <div key={member.id} className="flex items-center justify-between p-4 rounded-lg bg-zinc-100/30 border border-zinc-200/50 hover:bg-zinc-100/50 transition-colors">
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-300 font-bold border border-indigo-500/30">
+                  <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-700 font-bold border border-indigo-500/30">
                     {(member.user?.displayName || member.user_id).substring(0, 2).toUpperCase()}
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-white">{member.user?.displayName || 'Unknown User'}</p>
-                    <p className="text-xs text-slate-400 font-mono" title={member.user_id}>
+                    <p className="text-sm font-medium text-zinc-900">{member.user?.displayName || 'Unknown User'}</p>
+                    <p className="text-xs text-zinc-500 font-mono" title={member.user_id}>
                       {member.user_id.slice(0, 12)}...
                     </p>
                   </div>
@@ -199,8 +199,8 @@ export default function SettingsPage() {
                   {role === 'owner' && member.role !== 'owner' ? (
                     <select 
                       className={`text-sm px-3 py-1.5 rounded-md border appearance-none outline-none focus:ring-2 focus:ring-indigo-500 transition-colors ${
-                        member.role === 'editor' ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' :
-                        'bg-slate-700/50 text-slate-400 border-slate-600/30'
+                        member.role === 'editor' ? 'bg-blue-500/10 text-blue-600 border-blue-500/30' :
+                        'bg-zinc-100/50 text-zinc-500 border-zinc-200/30'
                       }`}
                       value={member.role}
                       onChange={async (e) => {
@@ -233,9 +233,9 @@ export default function SettingsPage() {
                         }
                       }}
                     >
-                      <option value="owner" className="bg-slate-900 text-white">Owner</option>
-                      <option value="editor" className="bg-slate-900 text-white">Editor</option>
-                      <option value="viewer" className="bg-slate-900 text-white">Viewer</option>
+                      <option value="owner" className="bg-white text-zinc-900">Owner</option>
+                      <option value="editor" className="bg-white text-zinc-900">Editor</option>
+                      <option value="viewer" className="bg-white text-zinc-900">Viewer</option>
                     </select>
                   ) : (
                     <Badge 
@@ -246,7 +246,7 @@ export default function SettingsPage() {
                   
                   {role === 'owner' && member.role !== 'owner' && (
                     <button 
-                      className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded transition-colors"
+                      className="p-1.5 text-zinc-500 hover:text-rose-600 hover:bg-rose-500/10 rounded transition-colors"
                       title="Remove Member"
                       onClick={async () => {
                         if (!confirm('Are you sure you want to remove this member?')) return;
@@ -276,7 +276,7 @@ export default function SettingsPage() {
               </div>
             ))}
             {members.length === 0 && (
-              <p className="text-slate-400 text-sm text-center py-4">No members found.</p>
+              <p className="text-zinc-500 text-sm text-center py-4">No members found.</p>
             )}
           </div>
         </Card>

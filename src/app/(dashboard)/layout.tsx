@@ -32,37 +32,47 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => { mounted = false; };
   }, [router]);
 
-  if (!isAuthResolved) return <div className="p-8 text-center text-slate-400">Loading workspace...</div>;
+  if (!isAuthResolved) return <div className="p-8 text-center text-zinc-500">Loading workspace...</div>;
   if (!isAuthenticated) return null; // Wait for redirect
 
-  const navItems = [
-    { name: 'Overview', path: '/dashboard' },
-    { name: 'Workflows', path: '/workflows' },
-    { name: 'Settings', path: '/settings' },
+  const navigation = [
+    { name: 'Overview', href: '/dashboard' },
+    { name: 'Workflows', href: '/workflows' },
+    { name: 'Settings', href: '/settings' },
   ];
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-950">
-      <aside className="w-64 border-r border-slate-800 bg-slate-900/50 backdrop-blur flex flex-col">
-        <div className="p-4 border-b border-slate-800">
-          <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400">
-            AgentFlow
-          </h2>
+    <div className="flex h-screen overflow-hidden bg-zinc-50">
+      <aside className="w-64 border-r border-zinc-200 bg-white flex flex-col shadow-sm">
+        <div className="h-16 flex items-center px-6 border-b border-zinc-200">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-zinc-900 flex items-center justify-center">
+              <span className="text-white font-bold">🤖</span>
+            </div>
+            <span className="font-bold text-zinc-900 tracking-tight">AgentFlow</span>
+          </div>
         </div>
-        <nav className="flex-1 p-4 space-y-1">
-          {navItems.map(item => (
-            <Link key={item.path} href={item.path}
-              className={`block px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                pathname === item.path || pathname.startsWith(item.path) && item.path !== '/dashboard'
-                  ? 'bg-indigo-500/10 text-indigo-400' 
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-              }`}>
-              {item.name}
-            </Link>
-          ))}
+        
+        <nav className="flex-1 py-4 px-3 space-y-1">
+          {navigation.map((item) => {
+            const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  isActive 
+                  ? 'bg-zinc-100 text-zinc-900 shadow-sm' 
+                  : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900'
+                }`}
+              >
+                {item.name}
+              </Link>
+            );
+          })}
         </nav>
-        <div className="p-4 border-t border-slate-800">
-          <button onClick={() => signOut()} className="text-sm text-slate-400 hover:text-white transition-colors">
+        <div className="p-4 border-t border-zinc-200">
+          <button onClick={() => signOut()} className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors">
             Log out
           </button>
         </div>
