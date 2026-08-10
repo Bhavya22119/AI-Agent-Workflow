@@ -126,7 +126,7 @@ async function executeRemainingSteps(runId: string, stepRuns: any[]) {
           const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_API_KEY}` },
-            body: JSON.stringify({ model: config.model || 'llama3-8b-8192', messages: [{ role: 'user', content: prompt }], max_tokens: 1024 }),
+            body: JSON.stringify({ model: config.model || 'llama-3.1-8b-instant', messages: [{ role: 'user', content: prompt }], max_tokens: 1024 }),
           });
           const data: any = await res.json();
           output = { result: data.choices?.[0]?.message?.content || '', provider: 'groq' };

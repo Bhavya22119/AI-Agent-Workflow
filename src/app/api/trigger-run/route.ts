@@ -20,14 +20,17 @@ async function adminQuery(query: string, variables?: Record<string, unknown>) {
 
 // ── Step Executors ──
 
-async function callLLM(prompt: string, model: string = 'llama3-8b-8192') {
+async function callLLM(prompt: string, model: string = 'llama-3.1-8b-instant') {
   if (GROQ_API_KEY) {
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_API_KEY}` },
       body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: 1024, temperature: 0.7 }),
     });
-    if (!res.ok) throw new Error(`Groq API error: ${res.status}`);
+    if (!res.ok) {
+      const errorBody = await res.text();
+      throw new Error(`Groq API error: ${res.status} - ${errorBody}`);
+    }
     const data: any = await res.json();
     return { result: data.choices[0]?.message?.content || '', provider: 'groq' };
   }
