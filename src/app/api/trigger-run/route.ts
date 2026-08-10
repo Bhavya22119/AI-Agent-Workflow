@@ -251,10 +251,10 @@ export async function POST(req: NextRequest) {
       await adminQuery(`mutation($objects: [step_runs_insert_input!]!) { insert_step_runs(objects: $objects) { affected_rows } }`, { objects: stepRunObjects });
     }
 
-    // 6. Execute asynchronously (non-blocking — don't await)
-    executeWorkflow(runId).catch(err => console.error('Workflow execution error:', err));
+    // 6. Execute workflow steps sequentially
+    await executeWorkflow(runId);
 
-    return NextResponse.json({ workflow_run_id: runId, status: 'pending' });
+    return NextResponse.json({ workflow_run_id: runId, status: 'started' });
   } catch (error: any) {
     console.error('trigger-run API error:', error);
     return NextResponse.json({ message: error.message || 'Internal error' }, { status: 500 });

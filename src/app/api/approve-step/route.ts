@@ -77,11 +77,9 @@ export async function POST(req: NextRequest) {
       }
     `, { runId, startPos: nextPos });
     
-    // Execute remaining steps asynchronously
+    // Execute remaining steps
     if (stepsData.step_runs?.length > 0) {
-      executeRemainingSteps(runId, stepsData.step_runs).catch(err => 
-        console.error('Resume execution error:', err)
-      );
+      await executeRemainingSteps(runId, stepsData.step_runs);
     } else {
       // No more steps — mark run completed
       await adminQuery(`
