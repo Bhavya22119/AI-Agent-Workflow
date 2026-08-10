@@ -34,25 +34,10 @@ export function useOrg() {
             setRole(data.org_members[0].role);
             localStorage.setItem('selected_org_id', data.org_members[0].org_id);
           } else {
-            // Auto-provision an organization for the new user
-            try {
-              const res = await fetch('/api/provision-org', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: user.id, email: user.email })
-              });
-              
-              if (res.ok) {
-                const provisionData = await res.json();
-                setOrgId(provisionData.org_id);
-                setRole('owner'); // Provisioned users are owners of their new org
-                localStorage.setItem('selected_org_id', provisionData.org_id);
-              } else {
-                setOrgId(null);
-                setRole(null);
-              }
-            } catch (provisionErr) {
-              console.error('Auto-provisioning failed:', provisionErr);
+            // User is not in any org — redirect to onboarding to join/create one
+            if (window.location.pathname !== '/onboarding') {
+              window.location.href = '/onboarding';
+            } else {
               setOrgId(null);
               setRole(null);
             }
