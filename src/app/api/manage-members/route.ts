@@ -44,14 +44,41 @@ export async function GET(req: NextRequest) {
           id
           user_id
           role
-          user {
-            displayName
-          }
         }
       }
     `, { orgId });
 
-    return NextResponse.json(membersData.org_members || []);
+    const members = membersData.org_members || [];
+
+    if (members.length === 0) {
+      return NextResponse.json([]);
+    }
+
+    // 3. Fetch user names manually since Hasura relationship isn't configured
+    const userIds = members.map((m: any) => m.user_id);
+    const usersData = await adminQuery(`
+      query($userIds: [uuid!]!) {
+        users(where: { id: { _in: $userIds } }) {
+          id
+          displayName
+        }
+      }
+    `, { userIds });
+
+    const userMap = new Map();
+    if (usersData.users) {
+      usersData.users.forEach((u: any) => userMap.set(u.id, u.displayName));
+    }
+
+    // 4. Merge data
+    const enrichedMembers = members.map((m: any) => ({
+      ...m,
+      user: {
+        displayName: userMap.get(m.user_id) || 'Unknown User'
+      }
+    }));
+
+    return NextResponse.json(enrichedMembers);
   } catch (error: any) {
     console.error('manage-members GET API error:', error);
     return NextResponse.json({ message: error.message || 'Internal error' }, { status: 500 });
