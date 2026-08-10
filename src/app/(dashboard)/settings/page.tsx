@@ -196,7 +196,6 @@ export default function SettingsPage() {
                   {role === 'owner' && member.role !== 'owner' ? (
                     <select 
                       className={`text-sm px-3 py-1.5 rounded-md border appearance-none outline-none focus:ring-2 focus:ring-indigo-500 transition-colors ${
-                        member.role === 'owner' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
                         member.role === 'editor' ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' :
                         'bg-slate-700/50 text-slate-400 border-slate-600/30'
                       }`}
