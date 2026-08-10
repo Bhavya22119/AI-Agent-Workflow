@@ -45,12 +45,12 @@ export default function WorkflowsPage() {
     fetchWorkflows();
   }, [orgId, request]);
 
-  if (orgLoading || loading) return <div className="p-8 text-center text-slate-400">Loading workflows...</div>;
+  if (orgLoading || loading) return <div className="p-8 text-center text-zinc-500">Loading workflows...</div>;
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-white">Workflows</h1>
+        <h1 className="text-3xl font-bold text-zinc-900">Workflows</h1>
         {role !== 'viewer' && (
           <Link href="/workflows/new">
             <Button>+ Create Workflow</Button>
@@ -61,23 +61,23 @@ export default function WorkflowsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {workflows.map(wf => (
           <Link key={wf.id} href={`/workflows/${wf.id}`}>
-            <Card className="hover:border-indigo-500/50 transition-colors cursor-pointer h-full">
+            <Card className="hover:border-zinc-300 transition-colors cursor-pointer h-full">
               <div className="flex justify-between items-start mb-4">
-                <h3 className="font-semibold text-lg text-white">{wf.name}</h3>
+                <h3 className="font-semibold text-lg text-zinc-900">{wf.name}</h3>
                 <Badge 
                   status={wf.workflow_runs?.[0]?.status || 'pending'} 
                   label={wf.workflow_runs?.[0]?.status || 'no runs'} 
                 />
               </div>
-              <p className="text-slate-400 text-sm mb-4 line-clamp-2">{wf.description || 'No description'}</p>
-              <div className="text-xs text-slate-500">
+              <p className="text-zinc-600 text-sm mb-4 line-clamp-2">{wf.description || 'No description'}</p>
+              <div className="text-xs text-zinc-500">
                 Created {new Date(wf.created_at).toLocaleDateString()}
               </div>
             </Card>
           </Link>
         ))}
         {workflows.length === 0 && (
-          <div className="col-span-full text-center py-12 text-slate-400 border border-dashed border-slate-700 rounded-xl">
+          <div className="col-span-full text-center py-12 text-zinc-500 border border-dashed border-zinc-300 rounded-xl">
             No workflows found. Create your first one to get started.
           </div>
         )}
