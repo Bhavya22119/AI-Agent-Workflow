@@ -12,6 +12,7 @@ import {
   ArrowRight
 } from "lucide-react";
 import { useAuthenticationStatus } from "@nhost/react";
+import { Hero01 } from "@/components/ui/hero-01";
 
 export default function Home() {
   const { isAuthenticated } = useAuthenticationStatus();
@@ -54,31 +55,8 @@ export default function Home() {
       {/* Hero Section */}
       <main className="flex-1 flex flex-col items-center justify-center mt-32 md:mt-48 px-4 z-10 w-full max-w-7xl mx-auto">
         
-        <div className="text-center max-w-4xl mx-auto mb-20 space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 text-indigo-300 text-sm font-medium mb-4">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-            </span>
-            AgentFlow 2.0 is Live
-          </div>
-          
-          <h1 className="text-5xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-white to-slate-500 tracking-tight leading-[1.1]">
-            Build autonomous AI <br className="hidden md:block" /> workflows in minutes.
-          </h1>
-          
-          <p className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed">
-            Drag, drop, and connect LLMs, databases, and APIs. AgentFlow gives you the power to automate your business with a world-class visual builder.
-          </p>
-          
-          <div className="flex items-center justify-center gap-4 pt-4">
-            <Link href={isAuthenticated ? "/workflows" : "/onboarding"}>
-              <Button className="h-14 px-8 rounded-full bg-white text-slate-900 hover:bg-slate-200 font-bold text-lg group transition-all duration-300 hover:shadow-[0_0_40px_rgba(255,255,255,0.3)]">
-                Start Building Free
-                <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </Button>
-            </Link>
-          </div>
+        <div className="w-full flex justify-center mb-10 z-10 pt-10">
+          <Hero01 />
         </div>
 
         {/* Features Bento Grid */}
