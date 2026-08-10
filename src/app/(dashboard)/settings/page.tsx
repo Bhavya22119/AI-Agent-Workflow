@@ -191,7 +191,7 @@ export default function SettingsPage() {
                 </div>
                 
                 <div className="flex items-center space-x-3">
-                  {role === 'owner' ? (
+                  {role === 'owner' && member.role !== 'owner' ? (
                     <select 
                       className={`text-sm px-3 py-1.5 rounded-md border appearance-none outline-none focus:ring-2 focus:ring-indigo-500 transition-colors ${
                         member.role === 'owner' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
@@ -240,7 +240,7 @@ export default function SettingsPage() {
                     />
                   )}
                   
-                  {role === 'owner' && (
+                  {role === 'owner' && member.role !== 'owner' && (
                     <button 
                       className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded transition-colors"
                       title="Remove Member"
