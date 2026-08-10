@@ -44,6 +44,9 @@ export async function GET(req: NextRequest) {
           id
           user_id
           role
+          user {
+            displayName
+          }
         }
       }
     `, { orgId });

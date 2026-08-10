@@ -15,6 +15,8 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   
+  const [step, setStep] = useState<1 | 2>(1);
+  const [displayName, setDisplayName] = useState('');
   const [action, setAction] = useState<'create' | 'join'>('create');
   const [orgName, setOrgName] = useState('');
   const [selectedOrgId, setSelectedOrgId] = useState('');
@@ -22,6 +24,9 @@ export default function OnboardingPage() {
   useEffect(() => {
     if (user) {
       setOrgName(`${user.email?.split('@')[0]}'s Workspace`);
+      if (user.displayName && !user.displayName.includes('@')) {
+        setDisplayName(user.displayName);
+      }
     }
     
     fetch('/api/organizations')
@@ -39,6 +44,13 @@ export default function OnboardingPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (step === 1) {
+      if (!displayName.trim()) return alert('Please enter your name');
+      setStep(2);
+      return;
+    }
+    
     if (!user) return;
     
     setSubmitting(true);
@@ -48,6 +60,7 @@ export default function OnboardingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: user.id,
+          displayName: displayName.trim(),
           action,
           orgName: action === 'create' ? orgName : undefined,
           orgId: action === 'join' ? selectedOrgId : undefined
@@ -68,7 +81,7 @@ export default function OnboardingPage() {
   };
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center text-slate-400">Loading workspaces...</div>;
+    return <div className="min-h-screen flex items-center justify-center text-slate-400">Loading workspace data...</div>;
   }
 
   return (
@@ -81,69 +94,104 @@ export default function OnboardingPage() {
       <Card className="w-full max-w-md p-8 relative z-10 bg-slate-900/80 backdrop-blur-xl border-slate-800">
         <div className="text-center mb-8">
           <div className="w-12 h-12 bg-indigo-500/20 text-indigo-400 rounded-xl flex items-center justify-center text-2xl mx-auto mb-4">
-            🚀
+            {step === 1 ? '👋' : '🚀'}
           </div>
-          <h1 className="text-2xl font-bold text-white mb-2">Welcome to AgentFlow</h1>
-          <p className="text-slate-400 text-sm">Let's set up your workspace to get started.</p>
-        </div>
-
-        <div className="flex bg-slate-800/50 p-1 rounded-lg mb-6 border border-slate-700/50">
-          <button 
-            className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${action === 'create' ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
-            onClick={() => setAction('create')}
-          >
-            Create New
-          </button>
-          <button 
-            className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${action === 'join' ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
-            onClick={() => setAction('join')}
-          >
-            Join Existing
-          </button>
+          <h1 className="text-2xl font-bold text-white mb-2">
+            {step === 1 ? 'Welcome to AgentFlow' : 'Set up your Workspace'}
+          </h1>
+          <p className="text-slate-400 text-sm">
+            {step === 1 ? "Let's get to know you first." : "Choose where you want to work."}
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {action === 'create' ? (
-            <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <label className="text-sm font-medium text-slate-300">Workspace Name</label>
+          {step === 1 ? (
+            <div className="space-y-2 animate-in fade-in slide-in-from-right-4 duration-300">
+              <label className="text-sm font-medium text-slate-300">What should we call you?</label>
               <Input 
-                value={orgName} 
-                onChange={e => setOrgName(e.target.value)} 
-                placeholder="My Awesome Workspace"
+                value={displayName} 
+                onChange={e => setDisplayName(e.target.value)} 
+                placeholder="e.g. John Doe"
                 required
-                className="bg-slate-950/50"
+                autoFocus
+                className="bg-slate-950/50 h-12 text-lg"
               />
-              <p className="text-xs text-slate-500 mt-2">You will be the <strong>Owner</strong> of this workspace.</p>
             </div>
           ) : (
-            <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <label className="text-sm font-medium text-slate-300">Select Workspace</label>
-              {organizations.length > 0 ? (
-                <>
-                  <Select 
-                    value={selectedOrgId} 
-                    onChange={e => setSelectedOrgId(e.target.value)}
+            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="flex bg-slate-800/50 p-1 rounded-lg mb-6 border border-slate-700/50">
+                <button 
+                  type="button"
+                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${action === 'create' ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                  onClick={() => setAction('create')}
+                >
+                  Create New
+                </button>
+                <button 
+                  type="button"
+                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${action === 'join' ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                  onClick={() => setAction('join')}
+                >
+                  Join Existing
+                </button>
+              </div>
+
+              {action === 'create' ? (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-300">Workspace Name</label>
+                  <Input 
+                    value={orgName} 
+                    onChange={e => setOrgName(e.target.value)} 
+                    placeholder="My Awesome Workspace"
+                    required
+                    autoFocus
                     className="bg-slate-950/50"
-                  >
-                    {organizations.map(org => (
-                      <option key={org.id} value={org.id}>{org.name}</option>
-                    ))}
-                  </Select>
-                  <p className="text-xs text-slate-500 mt-2">You will join as a <strong>Viewer</strong> until an Owner promotes you.</p>
-                </>
+                  />
+                  <p className="text-xs text-slate-500 mt-2">You will be the <strong>Owner</strong> of this workspace.</p>
+                </div>
               ) : (
-                <p className="text-sm text-rose-400 p-3 bg-rose-500/10 rounded-lg">No existing workspaces found. Please create one instead.</p>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-300">Select Workspace</label>
+                  {organizations.length > 0 ? (
+                    <>
+                      <Select 
+                        value={selectedOrgId} 
+                        onChange={e => setSelectedOrgId(e.target.value)}
+                        className="bg-slate-950/50"
+                      >
+                        {organizations.map(org => (
+                          <option key={org.id} value={org.id}>{org.name}</option>
+                        ))}
+                      </Select>
+                      <p className="text-xs text-slate-500 mt-2">You will join as a <strong>Viewer</strong> until an Owner promotes you.</p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-rose-400 p-3 bg-rose-500/10 rounded-lg">No existing workspaces found. Please create one instead.</p>
+                  )}
+                </div>
               )}
             </div>
           )}
 
-          <Button 
-            type="submit" 
-            className="w-full h-11 text-base font-medium shadow-[0_0_15px_rgba(99,102,241,0.2)] hover:shadow-[0_0_25px_rgba(99,102,241,0.4)] transition-all" 
-            disabled={submitting || (action === 'join' && organizations.length === 0)}
-          >
-            {submitting ? 'Setting up...' : 'Continue to Dashboard →'}
-          </Button>
+          <div className="flex gap-3">
+            {step === 2 && (
+              <Button 
+                type="button" 
+                variant="outline"
+                className="w-full h-11 text-base font-medium" 
+                onClick={() => setStep(1)}
+              >
+                Back
+              </Button>
+            )}
+            <Button 
+              type="submit" 
+              className="w-full h-11 text-base font-medium shadow-[0_0_15px_rgba(99,102,241,0.2)] hover:shadow-[0_0_25px_rgba(99,102,241,0.4)] transition-all" 
+              disabled={submitting || (step === 2 && action === 'join' && organizations.length === 0)}
+            >
+              {step === 1 ? 'Next →' : (submitting ? 'Setting up...' : 'Finish Setup')}
+            </Button>
+          </div>
         </form>
       </Card>
     </div>

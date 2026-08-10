@@ -22,6 +22,9 @@ interface OrgMember {
   id: string;
   user_id: string;
   role: 'owner' | 'editor' | 'viewer';
+  user?: {
+    displayName: string;
+  };
 }
 
 const QUERY = `
@@ -182,13 +185,13 @@ export default function SettingsPage() {
               <div key={member.id} className="flex items-center justify-between p-4 rounded-lg bg-slate-800/30 border border-slate-700/50 hover:bg-slate-800/50 transition-colors">
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-300 font-bold border border-indigo-500/30">
-                    {member.user_id.substring(0, 2).toUpperCase()}
+                    {(member.user?.displayName || member.user_id).substring(0, 2).toUpperCase()}
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-white font-mono" title={member.user_id}>
+                    <p className="text-sm font-medium text-white">{member.user?.displayName || 'Unknown User'}</p>
+                    <p className="text-xs text-slate-400 font-mono" title={member.user_id}>
                       {member.user_id.slice(0, 12)}...
                     </p>
-                    <p className="text-xs text-slate-400">User ID</p>
                   </div>
                 </div>
                 

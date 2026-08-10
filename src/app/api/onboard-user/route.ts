@@ -26,10 +26,19 @@ function uuidv4() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId, action, orgId, orgName } = await req.json();
+    const { userId, action, orgId, orgName, displayName } = await req.json();
 
     if (!userId || !action) {
       return NextResponse.json({ message: 'userId and action are required' }, { status: 400 });
+    }
+    
+    // Update the user's display name
+    if (displayName) {
+      await adminQuery(`
+        mutation($userId: uuid!, $name: String!) {
+          updateUsers(where: { id: { _eq: $userId } }, _set: { displayName: $name }) { affected_rows }
+        }
+      `, { userId, name: displayName });
     }
 
     // Check if user already has an org
