@@ -261,32 +261,22 @@ export default function WorkflowRunPage() {
       // Subscription will auto-update the UI
       fetchRun(); // Also refetch for immediate feedback
     } catch (actionErr: any) {
-      console.warn('approveStep Action failed, trying direct fallback:', actionErr);
+      console.warn('approveStep Action failed, trying API route fallback:', actionErr);
       
-      // Fallback: direct GraphQL update (in case Nhost Functions aren't deployed)
+      // Fallback: our Next.js API route (checks role + resumes execution)
       try {
         const user = nhost.auth.getUser();
-        const userId = user?.id || '';
-        
-        await request(`
-          mutation ApproveStepDirect($id: uuid!, $userId: uuid!, $time: timestamptz!) {
-            update_step_runs_by_pk(
-              pk_columns: { id: $id },
-              _set: { status: completed, approved_by: $userId, approved_at: $time }
-            ) { id }
-          }
-        `, { id: stepRunId, userId, time: new Date().toISOString() });
-
-        await request(`
-          mutation ResumeRun($id: uuid!) {
-            update_workflow_runs_by_pk(pk_columns: { id: $id }, _set: { status: running }) { id }
-          }
-        `, { id: runId });
-
+        const res = await fetch('/api/approve-step', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ step_run_id: stepRunId, user_id: user?.id }),
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.message || 'Approve failed');
         fetchRun();
-      } catch (directErr: any) {
-        console.error('Both approve paths failed:', directErr);
-        alert('Failed to approve step: ' + directErr.message);
+      } catch (apiErr: any) {
+        console.error('Both approve paths failed:', apiErr);
+        alert('Failed to approve step: ' + apiErr.message);
       }
     } finally {
       setApproving(false);

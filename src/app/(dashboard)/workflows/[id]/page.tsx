@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { useGraphQL } from '@/hooks/useGraphQL';
 import { useOrg } from '@/hooks/useOrg';
+import { nhost } from '@/lib/nhost';
 
 const STEP_TYPE_LABELS: Record<string, { label: string; icon: string; color: string }> = {
   llm_call: { label: 'LLM Call', icon: '🤖', color: 'text-violet-400 bg-violet-500/10 border-violet-500/20' },
@@ -79,13 +80,10 @@ export default function WorkflowDetailPage() {
 
   const handleRun = async () => {
     setTriggering(true);
+    let runId: string | null = null;
 
+    // 1. Try via Hasura Action (works when Nhost Functions are deployed)
     try {
-      // Use the triggerWorkflowRun Hasura Action — this:
-      // 1. Verifies the caller is owner/editor in the workflow's org
-      // 2. Checks the org's quota isn't exhausted
-      // 3. Creates workflow_run + step_runs
-      // 4. Calls executeWorkflow() to start real execution
       const data = await request(`
         mutation TriggerRun($id: uuid!) {
           triggerWorkflowRun(workflow_id: $id) {
@@ -94,25 +92,42 @@ export default function WorkflowDetailPage() {
           }
         }
       `, { id });
-      
-      const runId = data?.triggerWorkflowRun?.workflow_run_id;
-      
-      if (runId) {
-        router.push(`/workflows/${id}/runs/${runId}`);
-      } else {
-        alert('Failed to trigger workflow — no run ID returned');
+      runId = data?.triggerWorkflowRun?.workflow_run_id;
+    } catch (actionErr: any) {
+      console.warn('Hasura Action failed, falling back to API route:', actionErr.message);
+    }
+
+    // 2. Fallback: our Next.js API route (handles quota + role check + execution)
+    if (!runId) {
+      try {
+        const user = nhost.auth.getUser();
+        const res = await fetch('/api/trigger-run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ workflow_id: id, user_id: user?.id }),
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.message || 'API error');
+        runId = result.workflow_run_id;
+      } catch (apiErr: any) {
+        console.error('API route also failed:', apiErr);
+        const message = apiErr.message || 'Unknown error';
+        if (message.includes('quota') || message.includes('Quota')) {
+          alert('Organization quota exhausted — cannot start new runs');
+        } else if (message.includes('permission') || message.includes('Insufficient')) {
+          alert('You do not have permission to trigger this workflow');
+        } else {
+          alert('Failed to trigger workflow: ' + message);
+        }
         setTriggering(false);
+        return;
       }
-    } catch (err: any) {
-      console.error('Workflow trigger failed:', err);
-      const message = err.message || 'Unknown error';
-      if (message.includes('quota')) {
-        alert('Organization quota exhausted — cannot start new runs');
-      } else if (message.includes('permission') || message.includes('Insufficient')) {
-        alert('You do not have permission to trigger this workflow');
-      } else {
-        alert('Failed to trigger workflow: ' + message);
-      }
+    }
+
+    if (runId) {
+      router.push(`/workflows/${id}/runs/${runId}`);
+    } else {
+      alert('Failed to trigger workflow');
       setTriggering(false);
     }
   };
