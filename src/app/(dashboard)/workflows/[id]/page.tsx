@@ -79,10 +79,13 @@ export default function WorkflowDetailPage() {
 
   const handleRun = async () => {
     setTriggering(true);
-    let runId: string | null = null;
 
-    // 1. Try triggering via Hasura Action
     try {
+      // Use the triggerWorkflowRun Hasura Action — this:
+      // 1. Verifies the caller is owner/editor in the workflow's org
+      // 2. Checks the org's quota isn't exhausted
+      // 3. Creates workflow_run + step_runs
+      // 4. Calls executeWorkflow() to start real execution
       const data = await request(`
         mutation TriggerRun($id: uuid!) {
           triggerWorkflowRun(workflow_id: $id) {
@@ -91,58 +94,25 @@ export default function WorkflowDetailPage() {
           }
         }
       `, { id });
-      runId = data?.triggerWorkflowRun?.workflow_run_id;
-    } catch (actionErr) {
-      console.warn('Action trigger failed, falling back to direct GraphQL run creation:', actionErr);
-    }
-
-    // 2. Direct Fallback if Hasura Action serverless function is not active
-    if (!runId && workflow) {
-      try {
-        const targetOrgId = workflow.org_id || orgId;
-        const runRes = await request(`
-          mutation CreateRunDirect($workflowId: uuid!, $orgId: uuid!) {
-            insert_workflow_runs_one(object: {
-              workflow_id: $workflowId,
-              org_id: $orgId,
-              status: pending
-            }) {
-              id
-              status
-            }
-          }
-        `, { workflowId: id, orgId: targetOrgId });
-
-        runId = runRes.insert_workflow_runs_one.id;
-
-        if (runId && workflow.workflow_steps?.length > 0) {
-          const stepRunObjects = workflow.workflow_steps.map((step: any) => ({
-            workflow_run_id: runId,
-            workflow_step_id: step.id,
-            position: step.position,
-            status: 'pending',
-          }));
-
-          await request(`
-            mutation CreateStepRunsDirect($objects: [step_runs_insert_input!]!) {
-              insert_step_runs(objects: $objects) {
-                affected_rows
-              }
-            }
-          `, { objects: stepRunObjects });
-        }
-      } catch (directErr) {
-        console.error('Direct run creation failed:', directErr);
-        alert('Failed to trigger workflow');
+      
+      const runId = data?.triggerWorkflowRun?.workflow_run_id;
+      
+      if (runId) {
+        router.push(`/workflows/${id}/runs/${runId}`);
+      } else {
+        alert('Failed to trigger workflow — no run ID returned');
         setTriggering(false);
-        return;
       }
-    }
-
-    if (runId) {
-      router.push(`/workflows/${id}/runs/${runId}`);
-    } else {
-      alert('Failed to trigger workflow');
+    } catch (err: any) {
+      console.error('Workflow trigger failed:', err);
+      const message = err.message || 'Unknown error';
+      if (message.includes('quota')) {
+        alert('Organization quota exhausted — cannot start new runs');
+      } else if (message.includes('permission') || message.includes('Insufficient')) {
+        alert('You do not have permission to trigger this workflow');
+      } else {
+        alert('Failed to trigger workflow: ' + message);
+      }
       setTriggering(false);
     }
   };

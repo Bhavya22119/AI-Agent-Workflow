@@ -98,3 +98,25 @@ This design means:
 - The pause state is durable in the database — even if the server restarts, the paused run is still there
 - Resume is idempotent — calling approve on an already-approved step returns a 409 conflict
 - Double-approval is prevented by the `where: { status: { _eq: paused } }` condition in the update mutation
+
+---
+
+## Live Subscription for Step Progress
+
+The Run Viewer page uses a **GraphQL subscription** (via `graphql-ws`) to stream `step_runs` changes in real-time:
+
+```graphql
+subscription WatchStepRuns($runId: uuid!) {
+  step_runs(where: { workflow_run_id: { _eq: $runId } }, order_by: { position: asc }) {
+    id position status output error attempt_count
+    workflow_step { type config }
+  }
+}
+```
+
+The subscription connects to Hasura's WebSocket endpoint (`wss://...hasura.../v1/graphql`) with the user's JWT bearer token. When the server-side executor updates a `step_run` row (e.g., `status: pending → running → completed`), Hasura pushes the change through the WebSocket immediately — no polling delay.
+
+A separate subscription watches `workflow_runs_by_pk` for the overall run status, which is how the "paused, awaiting approval" state appears instantly.
+
+If the WebSocket connection fails (e.g., behind a restrictive proxy), the page falls back to HTTP polling as a graceful degradation. The UI shows "Live — WebSocket Subscription" or "Live — Polling" to indicate which mode is active.
+
