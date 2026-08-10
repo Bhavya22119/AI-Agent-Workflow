@@ -12,7 +12,6 @@ import {
   ArrowRight
 } from "lucide-react";
 import { useAuthenticationStatus } from "@nhost/react";
-import { Features } from "@/components/ui/features-10";
 
 export default function Home() {
   const { isAuthenticated } = useAuthenticationStatus();
