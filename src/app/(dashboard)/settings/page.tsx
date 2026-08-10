@@ -35,11 +35,6 @@ const QUERY = `
       total_runs
       total_workflows
     }
-    org_members(where: { org_id: { _eq: $orgId } }) {
-      id
-      user_id
-      role
-    }
   }
 `;
 
@@ -64,17 +59,24 @@ export default function SettingsPage() {
 
     const fetchData = async () => {
       try {
+        const user = nhost.auth.getUser();
+        
+        // 1. Fetch usage stats via frontend GraphQL
         const data = await request<{
           org_usage_summary: OrgUsageSummary[];
-          org_members: OrgMember[];
         }>(QUERY, { orgId });
+
+        // 2. Fetch all members via admin API route (bypasses RLS)
+        const membersRes = await fetch(`/api/manage-members?orgId=${orgId}&userId=${user?.id}`);
+        if (!membersRes.ok) throw new Error('Failed to fetch members list');
+        const membersData = await membersRes.json();
 
         if (isMounted) {
           if (data.org_usage_summary && data.org_usage_summary.length > 0) {
             setSummary(data.org_usage_summary[0]);
           }
-          if (data.org_members) {
-            setMembers(data.org_members);
+          if (membersData) {
+            setMembers(membersData);
           }
         }
       } catch (err: any) {
@@ -93,7 +95,7 @@ export default function SettingsPage() {
     return () => {
       isMounted = false;
     };
-  }, [orgId, orgLoading]);
+  }, [orgId, orgLoading, request]);
 
   const getRoleStatus = (r: string): RunStatus | undefined => {
     switch (r) {

@@ -17,6 +17,44 @@ async function adminQuery(query: string, variables?: Record<string, unknown>) {
   return json.data;
 }
 
+export async function GET(req: NextRequest) {
+  try {
+    const orgId = req.nextUrl.searchParams.get('orgId');
+    const userId = req.nextUrl.searchParams.get('userId');
+
+    if (!orgId || !userId) {
+      return NextResponse.json({ message: 'orgId and userId required' }, { status: 400 });
+    }
+
+    // 1. Verify caller belongs to the org
+    const callerData = await adminQuery(`
+      query($userId: uuid!, $orgId: uuid!) {
+        org_members(where: { user_id: { _eq: $userId }, org_id: { _eq: $orgId } }) { role }
+      }
+    `, { userId, orgId });
+
+    if (!callerData.org_members?.length) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 403 });
+    }
+
+    // 2. Fetch all members via admin query
+    const membersData = await adminQuery(`
+      query($orgId: uuid!) {
+        org_members(where: { org_id: { _eq: $orgId } }) {
+          id
+          user_id
+          role
+        }
+      }
+    `, { orgId });
+
+    return NextResponse.json(membersData.org_members || []);
+  } catch (error: any) {
+    console.error('manage-members GET API error:', error);
+    return NextResponse.json({ message: error.message || 'Internal error' }, { status: 500 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { action, callerUserId, orgId, targetMemberId, newRole } = await req.json();
