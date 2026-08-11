@@ -1,6 +1,4 @@
 import { NextResponse } from 'next/server';
-import { adminQuery } from '@/lib/engine/graphql';
-import { executeWorkflow } from '@/lib/engine/executor';
 
 export async function POST(req: Request) {
   try {
@@ -16,7 +14,7 @@ export async function POST(req: Request) {
 
     const graphqlUrl = process.env.NEXT_PUBLIC_NHOST_GRAPHQL_URL || `https://${process.env.NEXT_PUBLIC_NHOST_SUBDOMAIN}.graphql.${process.env.NEXT_PUBLIC_NHOST_REGION}.nhost.run/v1`;
 
-    // 1. Get org_id for this workflow
+    // 1. Get org_id for this workflow using Admin Secret
     const wfRes = await fetch(graphqlUrl, {
       method: 'POST',
       headers: {
@@ -76,50 +74,28 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Forbidden: You must be an owner or editor to run this workflow.' }, { status: 403 });
     }
 
-    // 3. Create workflow_run
-    const runData = await adminQuery(`
-      mutation CreateRun($workflowId: uuid!, $orgId: uuid!, $startedBy: uuid!) {
-        insert_workflow_runs_one(object: {
-          workflow_id: $workflowId,
-          org_id: $orgId,
-          status: pending,
-          started_by: $startedBy
-        }) { id status }
-      }
-    `, { workflowId, orgId, startedBy: userId });
+    // 3. Call the Nhost serverless function directly with the Hasura Action payload shape
+    const funcUrl = `https://${process.env.NEXT_PUBLIC_NHOST_SUBDOMAIN}.functions.${process.env.NEXT_PUBLIC_NHOST_REGION}.nhost.run/v1/trigger-workflow-run`;
     
-    const workflowRun = runData.insert_workflow_runs_one;
-    
-    // 4. Get steps and create step_runs
-    const stepsData = await adminQuery(`
-      query GetSteps($workflowId: uuid!) {
-        workflow_steps(where: { workflow_id: { _eq: $workflowId } }, order_by: { position: asc }) {
-          id position type config
-        }
-      }
-    `, { workflowId });
-    
-    const stepRunObjects = (stepsData.workflow_steps || []).map((step: any) => ({
-      workflow_run_id: workflowRun.id,
-      workflow_step_id: step.id,
-      position: step.position,
-      status: 'pending',
-    }));
-    
-    if (stepRunObjects.length > 0) {
-      await adminQuery(`
-        mutation CreateStepRuns($objects: [step_runs_insert_input!]!) {
-          insert_step_runs(objects: $objects) { affected_rows }
-        }
-      `, { objects: stepRunObjects });
-    }
-    
-    // 5. Start execution asynchronously (non-blocking)
-    executeWorkflow(workflowRun.id).catch((err: any) => {
-      console.error('Workflow execution failed:', err);
+    const funcRes = await fetch(funcUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        session_variables: { 'x-hasura-user-id': userId },
+        input: { workflow_id: workflowId }
+      })
     });
+
+    const funcData = await funcRes.json();
     
-    return NextResponse.json({ workflow_run_id: workflowRun.id, status: 'pending' });
+    if (!funcRes.ok) {
+      console.error('Nhost function error:', funcData);
+      return NextResponse.json({ error: funcData.message || 'Failed to trigger workflow' }, { status: funcRes.status });
+    }
+
+    return NextResponse.json(funcData);
   } catch (error: any) {
     console.error('Unexpected error:', error);
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
