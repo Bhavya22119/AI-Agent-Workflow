@@ -31,7 +31,7 @@ export default function Home() {
             ) : (
               <Link href="/onboarding">
                 <Button className="rounded-full bg-zinc-900 hover:bg-zinc-800 text-white font-semibold px-6 transition-all">
-                  Get Started
+                  Login / Signup
                 </Button>
               </Link>
             )}

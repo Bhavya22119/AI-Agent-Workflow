@@ -59,8 +59,12 @@ export default function OnboardingPage() {
       
       localStorage.setItem('selected_org_id', data.org_id);
       
-      // Force reload to let useOrg pick up the new membership
-      window.location.href = '/workflows';
+      if (data.role === 'pending') {
+        window.location.href = '/pending-approval';
+      } else {
+        // Force reload to let useOrg pick up the new membership
+        window.location.href = '/workflows';
+      }
     } catch (err: any) {
       alert(err.message || 'Onboarding failed');
       setSubmitting(false);

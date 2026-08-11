@@ -55,6 +55,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const navigation = [
     { name: 'Overview', href: '/dashboard' },
     { name: 'Workflows', href: '/workflows' },
+    { name: 'Members', href: '/members' },
     { name: 'Settings', href: '/settings' },
   ];
 
