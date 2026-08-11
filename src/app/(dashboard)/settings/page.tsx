@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useGraphQL } from "@/hooks/useGraphQL";
 import { RunStatus } from "@/lib/types";
 import { nhost } from "@/lib/nhost";
+import { useUserData } from "@nhost/react";
 
 interface OrgUsageSummary {
   name: string;
@@ -45,6 +46,7 @@ const QUERY = `
 export default function SettingsPage() {
   const { orgId, role, loading: orgLoading } = useOrg();
   const { request } = useGraphQL();
+  const user = useUserData();
   
   const [summary, setSummary] = useState<OrgUsageSummary | null>(null);
   const [members, setMembers] = useState<OrgMember[]>([]);
@@ -125,10 +127,36 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-4xl space-y-6">
-      <h1 className="text-3xl font-bold text-zinc-900 mb-8">Organization Settings</h1>
+      <h1 className="text-3xl font-bold text-zinc-900 mb-8">Settings</h1>
       
-      <Card>
-        <h2 className="text-xl font-bold text-zinc-900 mb-6">Organization Details</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <h2 className="text-xl font-bold text-zinc-900 mb-6">Your Profile</h2>
+          {user ? (
+            <div className="space-y-6">
+              <div>
+                <p className="text-sm text-zinc-500 mb-1">Name</p>
+                <p className="text-lg font-medium text-zinc-900">{user.displayName || 'Unknown User'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-zinc-500 mb-1">Email</p>
+                <p className="text-lg font-medium text-zinc-900">{user.email || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-zinc-500 mb-1">Your Role in Workspace</p>
+                <Badge 
+                  label={role ? role.charAt(0).toUpperCase() + role.slice(1) : 'Unknown'} 
+                  status={role ? getRoleStatus(role) : undefined} 
+                />
+              </div>
+            </div>
+          ) : (
+            <p className="text-zinc-500">Profile details not available.</p>
+          )}
+        </Card>
+
+        <Card>
+          <h2 className="text-xl font-bold text-zinc-900 mb-6">Organization Details</h2>
         {summary ? (
           <div className="space-y-6">
             <div>
@@ -170,7 +198,8 @@ export default function SettingsPage() {
         ) : (
           <p className="text-zinc-500">Organization details not available.</p>
         )}
-      </Card>
+        </Card>
+      </div>
 
       {role === 'owner' && (
       <Card>
