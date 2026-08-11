@@ -154,7 +154,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 mt-4">
             {step === 2 && (
               <Button 
                 type="button" 
@@ -168,11 +168,17 @@ export default function OnboardingPage() {
             <Button 
               type="submit" 
               className="w-full h-11 text-base font-medium bg-zinc-900 hover:bg-zinc-800 text-white transition-all" 
-              disabled={submitting || (step === 2 && !orgName.trim())}
+              disabled={submitting || (step === 2 && !orgName.trim()) || (step === 2 && user && !user.emailVerified)}
             >
               {step === 1 ? 'Next →' : (submitting ? 'Setting up...' : 'Finish Setup')}
             </Button>
           </div>
+          
+          {step === 2 && user && !user.emailVerified && (
+            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg text-center animate-in fade-in">
+              <strong>Check your inbox!</strong> You must verify your email address before you can finish setting up your workspace. Refresh this page after verifying.
+            </div>
+          )}
         </form>
       </Card>
     </div>
