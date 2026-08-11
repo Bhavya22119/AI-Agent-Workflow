@@ -183,6 +183,7 @@ export default function WorkflowDetailPage() {
               animated: true,
               style: { strokeWidth: 2, stroke: '#94a3b8' }
             }}
+            connectionLineStyle={{ stroke: '#6366f1', strokeWidth: 2 }}
           >
             <Background color="#cbd5e1" gap={24} size={2} />
             <Controls className="bg-white border-zinc-200 shadow-md rounded-lg overflow-hidden" />

@@ -16,7 +16,7 @@ export default function SettingsPanel({
 }) {
   if (!selectedNode) return null;
 
-  const { id, type, data } = selectedNode;
+  const { id, data } = selectedNode;
   const config = (data.config as any) || {};
 
   const handleConfigChange = (key: string, value: any) => {
@@ -53,7 +53,7 @@ export default function SettingsPanel({
         </div>
 
         {/* Dynamic Config Forms based on Type */}
-        {type === 'webhook_trigger' && (
+        {data.type === 'webhook_trigger' && (
           <div className="space-y-4">
             <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
               <p className="text-xs text-blue-700">Send a POST request to this workflow's webhook URL to trigger it.</p>
@@ -70,7 +70,31 @@ export default function SettingsPanel({
           </div>
         )}
 
-        {type === 'schedule_trigger' && (
+        {data.type === 'db_event_trigger' && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-zinc-700">Table Name</label>
+              <Input 
+                value={config.table || ''} 
+                onChange={(e) => handleConfigChange('table', e.target.value)}
+                placeholder="users"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-zinc-700">Event Type</label>
+              <Select 
+                value={config.event || 'insert'} 
+                onChange={(e) => handleConfigChange('event', e.target.value)}
+              >
+                <option value="insert">Insert</option>
+                <option value="update">Update</option>
+                <option value="delete">Delete</option>
+              </Select>
+            </div>
+          </div>
+        )}
+
+        {data.type === 'schedule_trigger' && (
           <div className="space-y-2">
             <label className="text-sm font-medium text-zinc-700">Cron Expression</label>
             <Input 
@@ -82,7 +106,7 @@ export default function SettingsPanel({
           </div>
         )}
 
-        {type === 'llm_call' && (
+        {data.type === 'llm_call' && (
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-zinc-700">Model</label>
@@ -117,7 +141,7 @@ export default function SettingsPanel({
           </div>
         )}
 
-        {type === 'http_request' && (
+        {data.type === 'http_request' && (
           <div className="space-y-4">
             <div className="flex gap-2">
               <div className="w-1/3 space-y-2">
@@ -164,7 +188,7 @@ export default function SettingsPanel({
           </div>
         )}
 
-        {type === 'conditional_branch' && (
+        {data.type === 'conditional_branch' && (
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-zinc-700">Condition Path</label>
@@ -197,7 +221,7 @@ export default function SettingsPanel({
           </div>
         )}
 
-        {type === 'notify' && (
+        {data.type === 'notify' && (
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-zinc-700">Channel</label>
@@ -230,7 +254,7 @@ export default function SettingsPanel({
           </div>
         )}
         
-        {type === 'db_write' && (
+        {data.type === 'db_write' && (
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-zinc-700">Table Name</label>
