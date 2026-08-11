@@ -45,6 +45,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Forbidden: You must be an owner or editor to modify this workflow.' }, { status: 403 });
     }
 
+    // Layer 2 - step-level gating: Only owners can add certain steps
+    const restrictedSteps = ['db_write', 'notify'];
+    const restrictedTriggers = ['webhook'];
+    
+    if (role !== 'owner') {
+      const hasRestrictedStep = steps.some((s: any) => restrictedSteps.includes(s.type));
+      const hasRestrictedTrigger = triggers.some((t: any) => restrictedTriggers.includes(t.type));
+      
+      if (hasRestrictedStep || hasRestrictedTrigger) {
+        return NextResponse.json({ error: 'Forbidden: Only Workspace Owners can add Database Write, Webhook Trigger, or Notify steps.' }, { status: 403 });
+      }
+    }
+
     // 2. Perform the delete + insert using Admin Secret
     const saveRes = await fetch(graphqlUrl, {
       method: 'POST',
