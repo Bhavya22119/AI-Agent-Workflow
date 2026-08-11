@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { adminQuery } from '@/lib/engine/graphql';
 import { executeWorkflow } from '@/lib/engine/executor';
+import { waitUntil } from '@vercel/functions';
 
 export async function POST(req: Request) {
   try {
@@ -114,10 +115,12 @@ export async function POST(req: Request) {
       `, { objects: stepRunObjects });
     }
     
-    // 5. Start execution asynchronously (non-blocking)
-    executeWorkflow(workflowRun.id).catch((err: any) => {
-      console.error('Workflow execution failed:', err);
-    });
+    // 5. Start execution asynchronously and use waitUntil so Vercel doesn't kill it
+    waitUntil(
+      executeWorkflow(workflowRun.id).catch((err: any) => {
+        console.error('Workflow execution failed:', err);
+      })
+    );
     
     return NextResponse.json({ workflow_run_id: workflowRun.id, status: 'pending' });
   } catch (error: any) {
