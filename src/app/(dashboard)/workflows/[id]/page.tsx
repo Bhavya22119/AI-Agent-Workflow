@@ -295,19 +295,19 @@ export default function WorkflowDetailPage() {
     setTriggering(true);
     try {
       const token = nhost.auth.getAccessToken();
-      const res = await fetch(`https://${process.env.NEXT_PUBLIC_NHOST_SUBDOMAIN}.functions.${process.env.NEXT_PUBLIC_NHOST_REGION}.nhost.run/v1/trigger-workflow-run`, {
+      const res = await fetch('/api/run-workflow', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ workflow_id: id })
+        body: JSON.stringify({ workflowId: id })
       });
       
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to trigger workflow');
       
-      router.push(`/workflows/${id}/runs/${data.run_id}`);
+      router.push(`/workflows/${id}/runs/${data.workflow_run_id}`);
     } catch (err: any) {
       alert(err.message);
     } finally {
