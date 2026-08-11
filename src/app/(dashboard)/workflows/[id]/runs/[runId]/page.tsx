@@ -411,13 +411,13 @@ export default function WorkflowRunPage() {
                         )}
                       </div>
                       {role !== 'viewer' && (
-                        <Button 
-                          className="bg-amber-500 hover:bg-amber-600 text-zinc-900 border-none shadow-lg shadow-amber-500/20"
+                        <button 
+                          className="px-4 py-2 rounded-md font-medium text-sm transition-colors bg-amber-500 hover:bg-amber-600 text-zinc-900 shadow-md disabled:opacity-50"
                           onClick={() => handleApprove(step.id)}
                           disabled={approving}
                         >
                           {approving ? 'Approving...' : '✅ Approve & Continue'}
-                        </Button>
+                        </button>
                       )}
                     </div>
                   </div>
