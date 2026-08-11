@@ -23,6 +23,9 @@ import { Button } from '@/components/ui/button';
 import CustomNode from '@/components/workflow-builder/CustomNode';
 import Sidebar from '@/components/workflow-builder/Sidebar';
 import SettingsPanel from '@/components/workflow-builder/SettingsPanel';
+import { Pencil } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 
 const nodeTypes = {
   custom: CustomNode,
@@ -50,7 +53,10 @@ export default function WorkflowDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [triggering, setTriggering] = useState(false);
-
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [savingSettings, setSavingSettings] = useState(false);
   const canEdit = role === 'owner' || role === 'editor';
 
   useEffect(() => {
@@ -319,7 +325,8 @@ export default function WorkflowDetailPage() {
     }
   };
 
-  const handleRun = async () => {
+  const handleTrigger = async () => {
+    if (!workflow) return;
     setTriggering(true);
     try {
       const token = nhost.auth.getAccessToken();
@@ -329,17 +336,45 @@ export default function WorkflowDetailPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ workflowId: id })
+        body: JSON.stringify({ workflowId: workflow.id })
       });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Trigger failed');
       
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to trigger workflow');
-      
-      router.push(`/workflows/${id}/runs/${data.workflow_run_id}`);
+      router.push(`/workflows/${workflow.id}/runs/${json.workflow_run_id}`);
     } catch (err: any) {
-      alert(err.message);
-    } finally {
+      alert('Error starting run: ' + err.message);
       setTriggering(false);
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    if (!editName.trim()) return alert('Name is required');
+    setSavingSettings(true);
+    try {
+      const token = nhost.auth.getAccessToken();
+      const res = await fetch('/api/update-workflow-settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          workflowId: workflow.id,
+          orgId: workflow.org_id,
+          name: editName,
+          description: editDesc
+        })
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Save failed');
+      
+      setWorkflow({ ...workflow, name: json.data.name, description: json.data.description });
+      setIsSettingsOpen(false);
+    } catch (err: any) {
+      alert('Error saving settings: ' + err.message);
+    } finally {
+      setSavingSettings(false);
     }
   };
 
@@ -382,8 +417,19 @@ export default function WorkflowDetailPage() {
     <div className="flex flex-col h-[calc(100vh-4rem)] bg-zinc-50 overflow-hidden">
       {/* Top Header */}
       <div className="h-14 border-b border-zinc-200 bg-white flex items-center justify-between px-6 shrink-0 z-10 shadow-sm">
-        <div>
-          <h2 className="font-semibold text-lg text-zinc-900">{workflow.name}</h2>
+        <div 
+          className={`group flex flex-col ${canEdit ? 'cursor-pointer hover:bg-zinc-50 p-1 -ml-1 rounded' : ''}`}
+          onClick={() => {
+            if (!canEdit) return;
+            setEditName(workflow.name);
+            setEditDesc(workflow.description || '');
+            setIsSettingsOpen(true);
+          }}
+        >
+          <div className="flex items-center gap-2">
+            <h2 className="font-semibold text-lg text-zinc-900">{workflow.name}</h2>
+            {canEdit && <Pencil className="w-3.5 h-3.5 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity" />}
+          </div>
           {workflow.description && (
             <p className="text-sm text-zinc-500 truncate w-96">{workflow.description}</p>
           )}
@@ -398,20 +444,19 @@ export default function WorkflowDetailPage() {
                 variant="secondary"
                 className="border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100"
               >
-                {deleting ? 'Deleting...' : 'Delete Workflow'}
+                {deleting ? 'Deleting...' : 'Delete'}
               </Button>
               <Button 
                 onClick={handleSave} 
                 disabled={saving} 
-                variant="secondary"
-                className="border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white"
               >
-                {saving ? 'Saving...' : 'Save Changes'}
+                {saving ? 'Saving...' : 'Save Workflow'}
               </Button>
             </>
           )}
           <Button 
-            onClick={handleRun} 
+            onClick={handleTrigger} 
             disabled={triggering}
             className="bg-zinc-900 hover:bg-zinc-800 text-white"
           >
@@ -470,6 +515,48 @@ export default function WorkflowDetailPage() {
           </ReactFlowProvider>
         </div>
       </div>
+      {/* Settings Modal */}
+      {isSettingsOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between">
+              <h3 className="font-semibold text-lg">Edit Workflow Details</h3>
+              <button onClick={() => setIsSettingsOpen(false)} className="text-zinc-400 hover:text-zinc-600">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700">Name</label>
+                <Input 
+                  value={editName} 
+                  onChange={(e) => setEditName(e.target.value)} 
+                  placeholder="e.g. Lead Qualification"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700">Description (Optional)</label>
+                <Textarea 
+                  value={editDesc} 
+                  onChange={(e) => setEditDesc(e.target.value)} 
+                  placeholder="What does this workflow do?"
+                  rows={3}
+                />
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-zinc-50 border-t border-zinc-100 flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setIsSettingsOpen(false)}>Cancel</Button>
+              <Button 
+                onClick={handleSaveSettings} 
+                disabled={savingSettings || !editName.trim()}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                {savingSettings ? 'Saving...' : 'Save Details'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
