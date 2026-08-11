@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Bot } from "lucide-react";
 import { useAuthenticationStatus } from "@nhost/react";
 import { Hero01 } from "@/components/ui/hero-01";
+import { HowItWorks } from "@/components/ui/how-it-works";
 
 export default function Home() {
   const { isAuthenticated } = useAuthenticationStatus();
@@ -49,6 +50,7 @@ export default function Home() {
       {/* Hero Section */}
       <main className="flex-1 flex flex-col items-center justify-center pt-24 z-10 w-full">
         <Hero01 />
+        <HowItWorks />
       </main>
 
     </div>
