@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import { Node } from '@xyflow/react';
+import { useParams } from 'next/navigation';
 
 export default function SettingsPanel({ 
   selectedNode, 
@@ -31,6 +32,13 @@ export default function SettingsPanel({
   const handleLabelChange = (value: string) => {
     onUpdate(id, { ...data, label: value });
   };
+
+  const params = useParams();
+  const workflowId = params.id as string;
+
+  const webhookUrl = typeof window !== 'undefined' 
+    ? `${window.location.origin}/api/webhooks/${workflowId}` 
+    : '';
 
   return (
     <div className="absolute top-4 right-4 bottom-4 w-80 bg-white border border-zinc-200 shadow-xl rounded-xl flex flex-col z-20 animate-in fade-in slide-in-from-right-8">
@@ -64,8 +72,13 @@ export default function SettingsPanel({
         {/* Dynamic Config Forms based on Type */}
         {data.type === 'webhook_trigger' && (
           <div className="space-y-4">
-            <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
+            <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg space-y-2">
               <p className="text-xs text-blue-700">Send a POST request to this workflow's webhook URL to trigger it.</p>
+              <div className="flex items-center gap-2 bg-white border border-blue-200 rounded p-1.5">
+                <code className="text-[10px] text-zinc-800 break-all overflow-hidden line-clamp-2 select-all">
+                  {webhookUrl}
+                </code>
+              </div>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-zinc-700">Webhook Secret (Optional)</label>
