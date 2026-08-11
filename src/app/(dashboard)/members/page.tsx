@@ -122,7 +122,7 @@ export default function MembersPage() {
                   <div className="text-sm text-zinc-500">{member.user.email}</div>
                 </div>
                 <div className="flex items-center gap-4">
-                  {isOwner ? (
+                  {isOwner && member.role !== 'owner' ? (
                     <select
                       className="border-zinc-200 rounded-md text-sm p-1.5 focus:ring-zinc-900 focus:border-zinc-900"
                       value={member.role}
@@ -133,7 +133,7 @@ export default function MembersPage() {
                       <option value="viewer">Viewer</option>
                     </select>
                   ) : (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-800 capitalize">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-800 capitalize border border-zinc-200 shadow-sm">
                       {member.role}
                     </span>
                   )}

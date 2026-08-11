@@ -41,6 +41,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Forbidden: Only owners can manage members.' }, { status: 403 });
     }
 
+    // Prevent modifying an owner
+    const targetRes = await adminQuery(`
+      query GetTargetRole($orgId: uuid!, $userId: uuid!) {
+        org_members(where: { org_id: { _eq: $orgId }, user_id: { _eq: $userId } }) {
+          role
+        }
+      }
+    `, { orgId, userId: targetUserId });
+    
+    const targetMember = targetRes.org_members?.[0];
+    if (!targetMember) {
+      return NextResponse.json({ error: 'Target member not found' }, { status: 404 });
+    }
+    
+    if (targetMember.role === 'owner') {
+      return NextResponse.json({ error: 'Cannot modify an owner account' }, { status: 403 });
+    }
+
     if (action === 'approve') {
       await adminQuery(`
         mutation ApproveMember($orgId: uuid!, $userId: uuid!) {
