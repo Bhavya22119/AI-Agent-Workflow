@@ -32,20 +32,20 @@ interface NodeData {
   status?: 'running' | 'completed' | 'failed' | 'paused' | 'pending';
 }
 
-const nodeStyles: Record<NodeType, { strip: string, bg: string, text: string, icon: any, defaultLabel: string }> = {
+const nodeStyles: Record<NodeType, { bg: string, text: string, icon: any, defaultLabel: string }> = {
   // Actions
-  llm_call: { strip: 'bg-purple-500', bg: 'bg-purple-500/10', text: 'text-purple-400', icon: Cpu, defaultLabel: 'LLM Call' },
-  http_request: { strip: 'bg-blue-500', bg: 'bg-blue-500/10', text: 'text-blue-400', icon: Globe, defaultLabel: 'HTTP Request' },
-  db_write: { strip: 'bg-emerald-500', bg: 'bg-emerald-500/10', text: 'text-emerald-400', icon: Database, defaultLabel: 'Database Write' },
-  notify: { strip: 'bg-rose-500', bg: 'bg-rose-500/10', text: 'text-rose-400', icon: Bell, defaultLabel: 'Notify' },
-  conditional_branch: { strip: 'bg-amber-500', bg: 'bg-amber-500/10', text: 'text-amber-400', icon: GitBranch, defaultLabel: 'If/Else' },
-  approval_gate: { strip: 'bg-indigo-500', bg: 'bg-indigo-500/10', text: 'text-indigo-400', icon: ShieldCheck, defaultLabel: 'Approval Gate' },
+  llm_call: { bg: 'bg-purple-100', text: 'text-purple-600', icon: Cpu, defaultLabel: 'LLM Call' },
+  http_request: { bg: 'bg-blue-100', text: 'text-blue-600', icon: Globe, defaultLabel: 'HTTP Request' },
+  db_write: { bg: 'bg-emerald-100', text: 'text-emerald-600', icon: Database, defaultLabel: 'Database Write' },
+  notify: { bg: 'bg-rose-100', text: 'text-rose-600', icon: Bell, defaultLabel: 'Notify' },
+  conditional_branch: { bg: 'bg-amber-100', text: 'text-amber-600', icon: GitBranch, defaultLabel: 'If/Else' },
+  approval_gate: { bg: 'bg-indigo-100', text: 'text-indigo-600', icon: ShieldCheck, defaultLabel: 'Approval Gate' },
   
   // Triggers
-  manual_trigger: { strip: 'bg-zinc-400', bg: 'bg-zinc-500/10', text: 'text-zinc-400', icon: MousePointerClick, defaultLabel: 'Manual Trigger' },
-  webhook_trigger: { strip: 'bg-zinc-400', bg: 'bg-zinc-500/10', text: 'text-zinc-400', icon: Webhook, defaultLabel: 'Webhook' },
-  schedule_trigger: { strip: 'bg-zinc-400', bg: 'bg-zinc-500/10', text: 'text-zinc-400', icon: Clock, defaultLabel: 'Schedule' },
-  db_event_trigger: { strip: 'bg-zinc-400', bg: 'bg-zinc-500/10', text: 'text-zinc-400', icon: Database, defaultLabel: 'DB Event' },
+  manual_trigger: { bg: 'bg-zinc-100', text: 'text-zinc-600', icon: MousePointerClick, defaultLabel: 'Manual Trigger' },
+  webhook_trigger: { bg: 'bg-zinc-100', text: 'text-zinc-600', icon: Webhook, defaultLabel: 'Webhook' },
+  schedule_trigger: { bg: 'bg-zinc-100', text: 'text-zinc-600', icon: Clock, defaultLabel: 'Schedule' },
+  db_event_trigger: { bg: 'bg-zinc-100', text: 'text-zinc-600', icon: Database, defaultLabel: 'DB Event' },
 };
 
 export default function CustomNode({ data, isConnectable, selected }: { data: NodeData, isConnectable: boolean, selected: boolean }) {
@@ -55,14 +55,12 @@ export default function CustomNode({ data, isConnectable, selected }: { data: No
 
   return (
     <div className={cn(
-      "flex items-center min-w-[240px] bg-[#1E2330] border rounded-lg shadow-md transition-all relative group",
-      selected ? "border-indigo-500 ring-1 ring-indigo-500/50 shadow-lg" : "border-zinc-700/60 hover:border-zinc-500 hover:shadow-lg",
+      "flex items-center min-w-[240px] bg-zinc-900 border rounded-xl shadow-sm transition-all relative group",
+      selected ? "border-indigo-500 shadow-md ring-1 ring-indigo-500/50" : "border-zinc-700 hover:border-zinc-600 hover:shadow-md",
       data.status === 'failed' && "border-rose-500",
       data.status === 'running' && "border-blue-500 animate-pulse",
       data.status === 'completed' && "border-emerald-500"
     )}>
-      {/* n8n style left color strip */}
-      <div className={cn("absolute left-0 top-0 bottom-0 w-1.5 rounded-l-lg", style.strip)} />
       
       {/* Input Handle (Left) - Not for Triggers */}
       {!isTrigger && (
@@ -70,14 +68,14 @@ export default function CustomNode({ data, isConnectable, selected }: { data: No
           type="target" 
           position={Position.Left} 
           isConnectable={isConnectable}
-          className="w-3 h-3 bg-zinc-400 border-2 border-[#1E2330] rounded-full -ml-[1.5px] z-10"
+          className="w-3 h-3 bg-zinc-600 border-2 border-zinc-900 rounded-full -ml-[1.5px]"
         />
       )}
 
       {/* Node Content */}
-      <div className="flex items-center w-full p-2.5 pl-4 gap-3">
+      <div className="flex items-center w-full p-3 gap-3">
         {/* Icon Container */}
-        <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center shrink-0 border border-zinc-700/50 shadow-inner", style.bg)}>
+        <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center shrink-0", style.bg)}>
           <Icon className={cn("w-5 h-5", style.text)} />
         </div>
         
@@ -99,7 +97,7 @@ export default function CustomNode({ data, isConnectable, selected }: { data: No
         type="source" 
         position={Position.Right} 
         isConnectable={isConnectable}
-        className="w-3 h-3 bg-indigo-400 border-2 border-[#1E2330] rounded-full -mr-[1.5px]"
+        className="w-3 h-3 bg-indigo-500 border-2 border-zinc-900 rounded-full -mr-[1.5px]"
       />
       
       {/* Additional Handle for False Branch in Conditionals */}
@@ -109,7 +107,7 @@ export default function CustomNode({ data, isConnectable, selected }: { data: No
           position={Position.Bottom} 
           id="false"
           isConnectable={isConnectable}
-          className="w-3 h-3 bg-rose-400 border-2 border-[#1E2330] rounded-full -mb-[1.5px]"
+          className="w-3 h-3 bg-rose-500 border-2 border-zinc-900 rounded-full -mb-[1.5px]"
         />
       )}
     </div>

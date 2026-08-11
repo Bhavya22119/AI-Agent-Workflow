@@ -414,11 +414,11 @@ export default function WorkflowDetailPage() {
   const selectedNode = nodes.find(n => n.id === selectedNodeId) || null;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] bg-zinc-950 overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-4rem)] bg-zinc-50 overflow-hidden">
       {/* Top Header */}
-      <div className="h-14 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between px-6 shrink-0 z-10 shadow-sm">
+      <div className="h-14 border-b border-zinc-200 bg-white flex items-center justify-between px-6 shrink-0 z-10 shadow-sm">
         <div 
-          className={`group flex flex-col ${canEdit ? 'cursor-pointer hover:bg-zinc-900 p-1 -ml-1 rounded' : ''}`}
+          className={`group flex flex-col ${canEdit ? 'cursor-pointer hover:bg-zinc-50 p-1 -ml-1 rounded' : ''}`}
           onClick={() => {
             if (!canEdit) return;
             setEditName(workflow.name);
@@ -427,29 +427,29 @@ export default function WorkflowDetailPage() {
           }}
         >
           <div className="flex items-center gap-2">
-            <h2 className="font-semibold text-lg text-white">{workflow.name}</h2>
-            {canEdit && <Pencil className="w-3.5 h-3.5 text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity" />}
+            <h2 className="font-semibold text-lg text-zinc-900">{workflow.name}</h2>
+            {canEdit && <Pencil className="w-3.5 h-3.5 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity" />}
           </div>
           {workflow.description && (
-            <p className="text-sm text-zinc-400 truncate w-96">{workflow.description}</p>
+            <p className="text-sm text-zinc-500 truncate w-96">{workflow.description}</p>
           )}
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="secondary" onClick={() => router.back()} className="bg-zinc-800 text-white hover:bg-zinc-700 border-0">Back</Button>
+          <Button variant="secondary" onClick={() => router.back()}>Back</Button>
           {canEdit && (
             <>
               <Button 
                 onClick={handleDelete} 
                 disabled={deleting} 
                 variant="secondary"
-                className="border-rose-900/50 text-rose-400 bg-rose-950 hover:bg-rose-900 border"
+                className="border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100"
               >
                 {deleting ? 'Deleting...' : 'Delete'}
               </Button>
               <Button 
                 onClick={handleSave} 
                 disabled={saving} 
-                className="bg-indigo-600 hover:bg-indigo-700 text-white border-0"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white"
               >
                 {saving ? 'Saving...' : 'Save Workflow'}
               </Button>
@@ -458,7 +458,7 @@ export default function WorkflowDetailPage() {
           <Button 
             onClick={handleTrigger} 
             disabled={triggering}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white border-0"
+            className="bg-zinc-900 hover:bg-zinc-800 text-white"
           >
             {triggering ? 'Starting...' : '▶ Run Workflow'}
           </Button>
@@ -517,41 +517,39 @@ export default function WorkflowDetailPage() {
       </div>
       {/* Settings Modal */}
       {isSettingsOpen && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="px-6 py-4 border-b border-zinc-800 flex items-center justify-between">
-              <h3 className="font-semibold text-lg text-white">Edit Workflow Details</h3>
-              <button onClick={() => setIsSettingsOpen(false)} className="text-zinc-400 hover:text-white">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between">
+              <h3 className="font-semibold text-lg">Edit Workflow Details</h3>
+              <button onClick={() => setIsSettingsOpen(false)} className="text-zinc-400 hover:text-zinc-600">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-300">Name</label>
+                <label className="text-sm font-medium text-zinc-700">Name</label>
                 <Input 
                   value={editName} 
                   onChange={(e) => setEditName(e.target.value)} 
                   placeholder="e.g. Lead Qualification"
-                  className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-300">Description (Optional)</label>
+                <label className="text-sm font-medium text-zinc-700">Description (Optional)</label>
                 <Textarea 
                   value={editDesc} 
                   onChange={(e) => setEditDesc(e.target.value)} 
                   placeholder="What does this workflow do?"
                   rows={3}
-                  className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
                 />
               </div>
             </div>
-            <div className="px-6 py-4 bg-zinc-950 border-t border-zinc-800 flex justify-end gap-3">
-              <Button variant="secondary" onClick={() => setIsSettingsOpen(false)} className="bg-zinc-800 text-white hover:bg-zinc-700 border-0">Cancel</Button>
+            <div className="px-6 py-4 bg-zinc-50 border-t border-zinc-100 flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setIsSettingsOpen(false)}>Cancel</Button>
               <Button 
                 onClick={handleSaveSettings} 
                 disabled={savingSettings || !editName.trim()}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white border-0"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white"
               >
                 {savingSettings ? 'Saving...' : 'Save Details'}
               </Button>
