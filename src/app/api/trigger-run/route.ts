@@ -22,17 +22,33 @@ async function adminQuery(query: string, variables?: Record<string, unknown>) {
 
 async function callLLM(prompt: string, model: string = 'llama-3.1-8b-instant') {
   if (GROQ_API_KEY) {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_API_KEY}` },
-      body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: 1024, temperature: 0.7 }),
-    });
-    if (!res.ok) {
-      const errorBody = await res.text();
-      throw new Error(`Groq API error: ${res.status} - ${errorBody}`);
+    // Map frontend values to valid Groq models
+    let groqModel = model;
+    if (model === 'llama-3') groqModel = 'llama3-8b-8192';
+    else if (model === 'llama-3.1-8b') groqModel = 'llama-3.1-8b-instant';
+    else if (model === 'gpt-4o' || model === 'claude-3') groqModel = 'llama3-70b-8192'; // Fallback for unsupported
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout to avoid Vercel 10s limits
+
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_API_KEY}` },
+        body: JSON.stringify({ model: groqModel, messages: [{ role: 'user', content: prompt }], max_tokens: 1024, temperature: 0.7 }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (!res.ok) {
+        const errorBody = await res.text();
+        throw new Error(`Groq API error: ${res.status} - ${errorBody}`);
+      }
+      const data: any = await res.json();
+      return { result: data.choices[0]?.message?.content || '', provider: 'groq' };
+    } catch (err) {
+      clearTimeout(timeoutId);
+      throw err;
     }
-    const data: any = await res.json();
-    return { result: data.choices[0]?.message?.content || '', provider: 'groq' };
   }
   // Stub fallback
   await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
@@ -57,7 +73,10 @@ function interpolate(template: string, input: any): string {
 async function executeStep(type: string, config: any, input: any, runId: string) {
   switch (type) {
     case 'llm_call': {
-      const prompt = interpolate(config.prompt || '', input);
+      const sysPrompt = config.system_prompt || '';
+      const usrPrompt = config.user_prompt || config.prompt || '';
+      const combinedPrompt = `${sysPrompt}\n${usrPrompt}`.trim();
+      const prompt = interpolate(combinedPrompt, input);
       let attempt = 0;
       while (attempt < 2) {
         try { return await callLLM(prompt, config.model); } 
