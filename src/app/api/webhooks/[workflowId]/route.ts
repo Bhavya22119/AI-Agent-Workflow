@@ -18,8 +18,9 @@ async function adminQuery(query: string, variables?: Record<string, unknown>) {
   return json.data;
 }
 
-export async function POST(req: NextRequest, { params }: { params: { workflowId: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ workflowId: string }> }) {
   try {
+    const params = await props.params;
     const { workflowId } = params;
     
     // 1. Get the workflow and its triggers

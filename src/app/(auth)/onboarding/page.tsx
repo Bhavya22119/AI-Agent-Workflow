@@ -168,7 +168,7 @@ export default function OnboardingPage() {
             <Button 
               type="submit" 
               className="w-full h-11 text-base font-medium bg-zinc-900 hover:bg-zinc-800 text-white transition-all" 
-              disabled={submitting || (step === 2 && !orgName.trim()) || (step === 2 && user && !user.emailVerified)}
+              disabled={submitting || (step === 2 && !orgName.trim()) || !!(step === 2 && user && !user.emailVerified)}
             >
               {step === 1 ? 'Next →' : (submitting ? 'Setting up...' : 'Finish Setup')}
             </Button>

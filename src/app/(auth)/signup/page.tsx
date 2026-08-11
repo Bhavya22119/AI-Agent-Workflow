@@ -36,7 +36,7 @@ export default function SignupPage() {
           <p className="font-medium">{successMsg}</p>
           <Button 
             className="mt-4 w-full"
-            variant="outline"
+            variant="secondary"
             onClick={() => window.location.href = '/login'}
           >
             Go to Login

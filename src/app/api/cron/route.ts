@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { executeWorkflow } from '@/lib/engine/executor';
 import { waitUntil } from '@vercel/functions';
-import cronParser from 'cron-parser';
+import { CronExpressionParser } from 'cron-parser';
 
 export const maxDuration = 60; // Up to 60 seconds
 
@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
       
       try {
         // Evaluate if it should have run in the last 5 minutes (since Vercel cron hits every 5 mins)
-        const interval = cronParser.parseExpression(expression);
+        const interval = CronExpressionParser.parse(expression);
         const prev = interval.prev().toDate();
         
         // If the previous scheduled time is within the last 5 minutes and 1 second, trigger it
