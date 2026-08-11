@@ -6,4 +6,3 @@ version = "0.30.0"
 [storage]
 version = "0.3.3"
 [functions]
-node = 18
