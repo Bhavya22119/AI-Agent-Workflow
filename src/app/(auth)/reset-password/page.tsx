@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, Suspense } from 'react';
 import { useChangePassword } from '@nhost/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const [newPassword, setNewPassword] = useState('');
   const { changePassword, isLoading, error, isSuccess } = useChangePassword();
   const router = useRouter();
@@ -71,5 +71,13 @@ export default function ResetPasswordPage() {
         </Button>
       </form>
     </Card>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<Card className="p-8 text-center text-white">Loading...</Card>}>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }
