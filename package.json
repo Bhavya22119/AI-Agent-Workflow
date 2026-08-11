@@ -22,14 +22,15 @@
     "graphql-ws": "^5.16.2",
     "lucide-react": "^0.395.0",
     "next": "16.3.0",
+    "nodemailer": "^9.0.5",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "resend": "^6.19.0",
     "tailwind-merge": "^2.3.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

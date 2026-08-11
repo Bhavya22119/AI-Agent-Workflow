@@ -149,27 +149,34 @@ async function executeNotify(config: any, input: any, workflowRunId: string): Pr
     }
   `, { orgId, runId: workflowRunId, key: 'notify_' + (config.channel || 'default'), value: { message: config.message, recipient: config.recipient, input } });
 
-  const resendApiKey = process.env.RESEND_API_KEY;
-  if (resendApiKey) {
+  const smtpEmail = process.env.SMTP_EMAIL;
+  const smtpPassword = process.env.SMTP_PASSWORD;
+  
+  if (smtpEmail && smtpPassword) {
     try {
-      // Dynamic import to avoid loading it if not needed everywhere
-      const { Resend } = await import('resend');
-      const resend = new Resend(resendApiKey);
-      
+      const nodemailer = await import('nodemailer');
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: smtpEmail,
+          pass: smtpPassword,
+        },
+      });
+
       const emailContent = interpolate(config.message || '', input, []);
       
-      await resend.emails.send({
-        from: 'onboarding@resend.dev',
+      await transporter.sendMail({
+        from: `"AI Agent Builder" <${smtpEmail}>`,
         to: config.recipient,
         subject: 'AI Agent Workflow Notification',
         html: `<p>${emailContent.replace(/\n/g, '<br/>')}</p>`,
       });
-      console.log(`[RESEND EMAIL] Successfully sent to ${config.recipient}`);
+      console.log(`[SMTP EMAIL] Successfully sent to ${config.recipient}`);
     } catch (err: any) {
-      console.error(`[RESEND EMAIL FAILED] Error:`, err);
+      console.error(`[SMTP EMAIL FAILED] Error:`, err);
     }
   } else {
-    console.log(`[SIMULATED EMAIL] (RESEND_API_KEY not found) Sent to ${config.recipient || 'unknown'}: ${config.message || ''}`);
+    console.log(`[SIMULATED EMAIL] (SMTP_EMAIL not found) Sent to ${config.recipient || 'unknown'}: ${config.message || ''}`);
   }
 
   return { success: true };
