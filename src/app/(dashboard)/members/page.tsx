@@ -89,8 +89,6 @@ export default function MembersPage() {
   const activeMembers = members.filter(m => m.role !== 'pending');
   const pendingMembers = members.filter(m => m.role === 'pending');
 
-  const isOwner = currentRole === 'owner';
-
   return (
     <div className="max-w-4xl space-y-6">
       <div className="flex items-center justify-between">
