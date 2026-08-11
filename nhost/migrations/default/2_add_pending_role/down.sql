@@ -1,0 +1,2 @@
+-- PostgreSQL does not easily support removing ENUM values.
+-- We keep 'pending' in the database even if rolling back.

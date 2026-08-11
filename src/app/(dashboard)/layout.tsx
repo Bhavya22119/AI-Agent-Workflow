@@ -4,6 +4,8 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { nhost } from '@/lib/nhost';
+import { useOrg } from '@/hooks/useOrg';
+import { Button } from '@/components/ui/button';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -32,8 +34,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => { mounted = false; };
   }, [router]);
 
-  if (!isAuthResolved) return <div className="p-8 text-center text-zinc-500">Loading workspace...</div>;
+  const { role, loading: orgLoading } = useOrg();
+
+  if (!isAuthResolved || orgLoading) return <div className="p-8 text-center text-zinc-500">Loading workspace...</div>;
   if (!isAuthenticated) return null; // Wait for redirect
+
+  if (role === 'pending') {
+    return (
+      <div className="flex h-screen items-center justify-center bg-zinc-50">
+        <div className="max-w-md p-8 bg-white border border-zinc-200 rounded-xl shadow-sm text-center">
+          <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-6 text-2xl">⏳</div>
+          <h1 className="text-2xl font-bold text-zinc-900 mb-2">Approval Pending</h1>
+          <p className="text-zinc-600 mb-6">Your request to join the organization has been sent. Please wait for an Owner to approve your request.</p>
+          <Button onClick={() => signOut()} variant="ghost" className="w-full border border-zinc-200">Sign Out</Button>
+        </div>
+      </div>
+    );
+  }
 
   const navigation = [
     { name: 'Overview', href: '/dashboard' },

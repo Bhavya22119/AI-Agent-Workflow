@@ -5,21 +5,18 @@ import { useUserData } from '@nhost/react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
 
 export default function OnboardingPage() {
   const user = useUserData();
   const router = useRouter();
   
-  const [organizations, setOrganizations] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   
   const [step, setStep] = useState<1 | 2>(1);
   const [displayName, setDisplayName] = useState('');
   const [action, setAction] = useState<'create' | 'join'>('create');
   const [orgName, setOrgName] = useState('');
-  const [selectedOrgId, setSelectedOrgId] = useState('');
   
   useEffect(() => {
     if (user) {
@@ -29,17 +26,8 @@ export default function OnboardingPage() {
       }
     }
     
-    fetch('/api/organizations')
-      .then(res => res.json())
-      .then(data => {
-        setOrganizations(data);
-        if (data.length > 0) setSelectedOrgId(data[0].id);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Failed to fetch orgs', err);
-        setLoading(false);
-      });
+    // Organizations API is deleted for security, skipping fetch
+    setLoading(false);
   }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -62,8 +50,7 @@ export default function OnboardingPage() {
           userId: user.id,
           displayName: displayName.trim(),
           action,
-          orgName: action === 'create' ? orgName : undefined,
-          orgId: action === 'join' ? selectedOrgId : undefined
+          orgName: orgName
         })
       });
       
@@ -149,23 +136,15 @@ export default function OnboardingPage() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-zinc-700">Select Workspace</label>
-                  {organizations.length > 0 ? (
-                    <>
-                      <Select 
-                        value={selectedOrgId} 
-                        onChange={e => setSelectedOrgId(e.target.value)}
-                        className="bg-zinc-50 border-zinc-200"
-                      >
-                        {organizations.map(org => (
-                          <option key={org.id} value={org.id}>{org.name}</option>
-                        ))}
-                      </Select>
-                      <p className="text-xs text-zinc-500 mt-2">You will join as a <strong>Viewer</strong> until an Owner promotes you.</p>
-                    </>
-                  ) : (
-                    <p className="text-sm text-rose-600 p-3 bg-rose-50 rounded-lg">No existing workspaces found. Please create one instead.</p>
-                  )}
+                  <label className="text-sm font-medium text-zinc-700">Enter Workspace Name</label>
+                  <Input 
+                    value={orgName} 
+                    onChange={e => setOrgName(e.target.value)} 
+                    placeholder="Exact workspace name"
+                    required
+                    className="bg-zinc-50 border-zinc-200"
+                  />
+                  <p className="text-xs text-zinc-500 mt-2">You will need <strong>Owner approval</strong> to access the workspace.</p>
                 </div>
               )}
             </div>
@@ -185,7 +164,7 @@ export default function OnboardingPage() {
             <Button 
               type="submit" 
               className="w-full h-11 text-base font-medium bg-zinc-900 hover:bg-zinc-800 text-white transition-all" 
-              disabled={submitting || (step === 2 && action === 'join' && organizations.length === 0)}
+              disabled={submitting || (step === 2 && !orgName.trim())}
             >
               {step === 1 ? 'Next →' : (submitting ? 'Setting up...' : 'Finish Setup')}
             </Button>

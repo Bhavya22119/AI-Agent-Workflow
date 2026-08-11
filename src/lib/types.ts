@@ -1,4 +1,4 @@
-export type Role = 'owner' | 'editor' | 'viewer';
+export type Role = 'owner' | 'editor' | 'viewer' | 'pending';
 export type RunStatus = 'pending' | 'running' | 'paused' | 'completed' | 'failed' | 'skipped';
 
 export interface Organization {

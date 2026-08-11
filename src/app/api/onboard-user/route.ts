@@ -72,17 +72,29 @@ export async function POST(req: NextRequest) {
     } 
     
     else if (action === 'join') {
-      if (!orgId) return NextResponse.json({ message: 'orgId is required to join' }, { status: 400 });
+      if (!orgName) return NextResponse.json({ message: 'orgName is required to join' }, { status: 400 });
       
+      // Look up org by name (case-insensitive)
+      const orgQuery = await adminQuery(`
+        query($orgName: String!) {
+          organizations(where: { name: { _ilike: $orgName } }, limit: 1) { id }
+        }
+      `, { orgName });
+      
+      const foundOrgId = orgQuery.organizations?.[0]?.id;
+      if (!foundOrgId) {
+        return NextResponse.json({ message: 'Organization not found' }, { status: 404 });
+      }
+
       await adminQuery(`
         mutation($orgId: uuid!, $userId: uuid!) {
           insert_org_members_one(object: {
-            org_id: $orgId, user_id: $userId, role: "viewer"
+            org_id: $orgId, user_id: $userId, role: "pending"
           }) { id }
         }
-      `, { orgId, userId });
+      `, { orgId: foundOrgId, userId });
       
-      return NextResponse.json({ org_id: orgId, role: 'viewer' });
+      return NextResponse.json({ org_id: foundOrgId, role: 'pending' });
     }
 
     return NextResponse.json({ message: 'Invalid action' }, { status: 400 });

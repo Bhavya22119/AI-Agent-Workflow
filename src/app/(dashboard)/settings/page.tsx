@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useOrg } from "@/hooks/useOrg";
+import { Button } from "@/components/ui/button";
 import { useGraphQL } from "@/hooks/useGraphQL";
 import { RunStatus } from "@/lib/types";
 import { nhost } from "@/lib/nhost";
@@ -21,7 +22,7 @@ interface OrgUsageSummary {
 interface OrgMember {
   id: string;
   user_id: string;
-  role: 'owner' | 'editor' | 'viewer';
+  role: 'owner' | 'editor' | 'viewer' | 'pending';
   user?: {
     displayName: string;
   };
@@ -69,10 +70,14 @@ export default function SettingsPage() {
           org_usage_summary: OrgUsageSummary[];
         }>(QUERY, { orgId });
 
-        // 2. Fetch all members via admin API route (bypasses RLS)
-        const membersRes = await fetch(`/api/manage-members?orgId=${orgId}&userId=${user?.id}`);
-        if (!membersRes.ok) throw new Error('Failed to fetch members list');
-        const membersData = await membersRes.json();
+        // 2. Fetch all members via admin API route only if owner
+        let membersData = [];
+        if (role === 'owner') {
+          const membersRes = await fetch(`/api/manage-members?orgId=${orgId}&userId=${user?.id}`);
+          if (membersRes.ok) {
+            membersData = await membersRes.json();
+          }
+        }
 
         if (isMounted) {
           if (data.org_usage_summary && data.org_usage_summary.length > 0) {
@@ -105,6 +110,7 @@ export default function SettingsPage() {
       case 'owner': return 'completed';
       case 'editor': return 'running';
       case 'viewer': return 'pending';
+      case 'pending': return 'paused';
       default: return undefined;
     }
   };
@@ -166,6 +172,7 @@ export default function SettingsPage() {
         )}
       </Card>
 
+      {role === 'owner' && (
       <Card>
         <h2 className="text-xl font-bold text-zinc-900 mb-4">Members</h2>
         <p className="text-sm text-zinc-500 mb-6">
@@ -236,6 +243,7 @@ export default function SettingsPage() {
                       <option value="owner" className="bg-white text-zinc-900">Owner</option>
                       <option value="editor" className="bg-white text-zinc-900">Editor</option>
                       <option value="viewer" className="bg-white text-zinc-900">Viewer</option>
+                      {member.role === 'pending' && <option value="pending" className="bg-white text-amber-600">Pending</option>}
                     </select>
                   ) : (
                     <Badge 
@@ -243,13 +251,72 @@ export default function SettingsPage() {
                       status={getRoleStatus(member.role)} 
                     />
                   )}
-                  
-                  {role === 'owner' && member.role !== 'owner' && (
+
+                  {role === 'owner' && member.role === 'pending' && (
+                    <div className="flex space-x-2 ml-2">
+                      <Button 
+                        size="sm" 
+                        className="bg-emerald-500 hover:bg-emerald-600 text-white border-transparent"
+                        onClick={async () => {
+                          try {
+                            const user = nhost.auth.getUser();
+                            const res = await fetch('/api/manage-members', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                action: 'update_role',
+                                callerUserId: user?.id,
+                                orgId,
+                                targetMemberId: member.id,
+                                newRole: 'viewer'
+                              })
+                            });
+                            if (!res.ok) throw new Error(await res.text());
+                            setMembers(members.map(m => m.id === member.id ? { ...m, role: 'viewer' } : m));
+                          } catch (err: any) {
+                            alert('Failed to approve: ' + err.message);
+                          }
+                        }}
+                      >
+                        Approve
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200"
+                        onClick={async () => {
+                          if (!confirm('Reject this request?')) return;
+                          try {
+                            const user = nhost.auth.getUser();
+                            const res = await fetch('/api/manage-members', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                action: 'remove_member',
+                                callerUserId: user?.id,
+                                orgId,
+                                targetMemberId: member.id
+                              })
+                            });
+                            if (!res.ok) throw new Error(await res.text());
+                            setMembers(members.filter(m => m.id !== member.id));
+                          } catch (err: any) {
+                            alert('Failed to reject: ' + err.message);
+                          }
+                        }}
+                      >
+                        Reject
+                      </Button>
+                    </div>
+                  )}
+
+                  {role === 'owner' && member.user_id !== nhost.auth.getUser()?.id && member.role !== 'pending' && (
                     <button 
-                      className="p-1.5 text-zinc-500 hover:text-rose-600 hover:bg-rose-500/10 rounded transition-colors"
+                      className="text-zinc-400 hover:text-rose-500 transition-colors p-2 rounded-md hover:bg-rose-50"
                       title="Remove Member"
                       onClick={async () => {
-                        if (!confirm('Are you sure you want to remove this member?')) return;
+                        if (!confirm(`Are you sure you want to remove this member from the organization?`)) return;
+                        
                         try {
                           const user = nhost.auth.getUser();
                           const res = await fetch('/api/manage-members', {
@@ -259,27 +326,33 @@ export default function SettingsPage() {
                               action: 'remove_member',
                               callerUserId: user?.id,
                               orgId,
-                              targetMemberId: member.id,
+                              targetMemberId: member.id
                             })
                           });
-                          if (!res.ok) throw new Error((await res.json()).message);
+                          
+                          if (!res.ok) {
+                            const err = await res.json();
+                            throw new Error(err.message);
+                          }
+                          
                           setMembers(members.filter(m => m.id !== member.id));
                         } catch (err: any) {
                           alert('Failed to remove member: ' + err.message);
                         }
                       }}
                     >
-                      ✕
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
                     </button>
                   )}
                 </div>
               </div>
             ))}
             {members.length === 0 && (
-              <p className="text-zinc-500 text-sm text-center py-4">No members found.</p>
+              <p className="text-sm text-zinc-500 italic p-4 text-center bg-zinc-50 rounded border border-zinc-100">No members found.</p>
             )}
           </div>
-        </Card>
-      </div>
-    );
-  }
+      </Card>
+      )}
+    </div>
+  );
+}

@@ -26,10 +26,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'orgId and userId required' }, { status: 400 });
     }
 
-    // 1. Verify caller belongs to the org
+    // 1. Verify caller is owner
     const callerData = await adminQuery(`
       query($userId: uuid!, $orgId: uuid!) {
-        org_members(where: { user_id: { _eq: $userId }, org_id: { _eq: $orgId } }) { role }
+        org_members(where: { user_id: { _eq: $userId }, org_id: { _eq: $orgId }, role: { _eq: "owner" } }) { role }
       }
     `, { userId, orgId });
 

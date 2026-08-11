@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useUserData } from '@nhost/react';
 import { useGraphQL } from './useGraphQL';
+import { Role } from '@/lib/types';
 
 export function useOrg() {
   const user = useUserData();
   const { request } = useGraphQL();
   const [orgId, setOrgId] = useState<string | null>(null);
-  const [role, setRole] = useState<'owner' | 'editor' | 'viewer' | null>(null);
+  const [role, setRole] = useState<Role | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
