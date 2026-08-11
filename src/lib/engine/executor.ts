@@ -210,25 +210,67 @@ async function executeNotify(config: any, input: any, workflowRunId: string): Pr
 }
 
 async function executeConditionalBranch(config: any, input: any, stepRuns: StepRun[], currentPos: number, runId: string): Promise<any> {
-  const val = input?.result || input;
+  const conditionStr = config.condition_path || '';
+  const evaluatedStr = interpolate(conditionStr, input, stepRuns);
+  
   let conditionMet = false;
-  if (config.condition) {
-    const { operator, value } = config.condition;
-    if (operator === 'equals') conditionMet = (val === value);
-    else if (operator === 'not_equals') conditionMet = (val !== value);
-    else if (operator === 'contains') conditionMet = String(val).includes(String(value));
+  try {
+    if (evaluatedStr.includes('==')) {
+      const parts = evaluatedStr.split('==').map(s => s.trim().replace(/^['"]|['"]$/g, ''));
+      conditionMet = parts[0] === parts[1];
+    } else if (evaluatedStr.includes('!=')) {
+      const parts = evaluatedStr.split('!=').map(s => s.trim().replace(/^['"]|['"]$/g, ''));
+      conditionMet = parts[0] !== parts[1];
+    } else if (evaluatedStr.includes('>')) {
+      const parts = evaluatedStr.split('>').map(s => s.trim());
+      conditionMet = Number(parts[0]) > Number(parts[1]);
+    } else if (evaluatedStr.includes('<')) {
+      const parts = evaluatedStr.split('<').map(s => s.trim());
+      conditionMet = Number(parts[0]) < Number(parts[1]);
+    } else {
+      conditionMet = evaluatedStr.toLowerCase() === 'true';
+    }
+  } catch (e) {
+    console.error('Condition parse error', e);
   }
   
-  const skipTo = conditionMet ? config.true_next : config.false_next;
-  if (skipTo) {
-    for (const step of stepRuns) {
-      if (step.position > currentPos && step.position < skipTo) {
-        await updateStepRunStatus(step.id, 'skipped');
-        step.status = 'skipped';
+  // DAG Branch skipping logic
+  const outEdges = config.ui?.out_edges || [];
+  
+  // If conditionMet is true, we skip the 'false' handle branch. 
+  // If conditionMet is false, we skip the 'null'/'undefined' handle branch (True branch).
+  const unchosenHandle = conditionMet ? 'false' : null;
+  
+  const unchosenEdges = outEdges.filter((e: any) => 
+    e.sourceHandle === unchosenHandle || (unchosenHandle === null && (!e.sourceHandle || e.sourceHandle === 'true'))
+  );
+  
+  const nodesToSkip = new Set<string>();
+  const queue = unchosenEdges.map((e: any) => e.target);
+  
+  while (queue.length > 0) {
+    const nodeId = queue.shift()!;
+    if (!nodesToSkip.has(nodeId)) {
+      nodesToSkip.add(nodeId);
+      const step = stepRuns.find(s => s.workflow_step.config?.ui?.id === nodeId);
+      if (step) {
+        const stepEdges = step.workflow_step.config?.ui?.out_edges || [];
+        for (const edge of stepEdges) {
+          queue.push(edge.target);
+        }
       }
     }
   }
-  return { conditionMet };
+  
+  for (const step of stepRuns) {
+    const uiId = step.workflow_step.config?.ui?.id;
+    if (uiId && nodesToSkip.has(uiId)) {
+      await updateStepRunStatus(step.id, 'skipped');
+      step.status = 'skipped';
+    }
+  }
+  
+  return { conditionMet, evaluatedStr };
 }
 
 export async function executeWorkflow(workflowRunId: string, startPosition: number = 1): Promise<void> {

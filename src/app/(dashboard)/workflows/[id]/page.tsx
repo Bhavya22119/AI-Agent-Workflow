@@ -211,8 +211,36 @@ export default function WorkflowDetailPage() {
     setSaving(true);
 
     try {
-      // 1. Format action nodes
-      const formattedSteps = actionNodes.map((node, idx) => {
+      // 1. Topologically sort actionNodes
+      const sortedActionNodes: typeof actionNodes = [];
+      const visited = new Set<string>();
+      const visiting = new Set<string>();
+
+      const visit = (nodeId: string) => {
+        if (visited.has(nodeId)) return;
+        if (visiting.has(nodeId)) return; // Cycle detected, ignore
+        visiting.add(nodeId);
+
+        const incomingEdges = edges.filter(e => e.target === nodeId);
+        for (const edge of incomingEdges) {
+          if (actionNodes.find(n => n.id === edge.source)) {
+            visit(edge.source);
+          }
+        }
+
+        visiting.delete(nodeId);
+        visited.add(nodeId);
+        
+        const node = actionNodes.find(n => n.id === nodeId);
+        if (node) sortedActionNodes.push(node);
+      };
+
+      for (const node of actionNodes) {
+        visit(node.id);
+      }
+
+      // 2. Format action nodes with sequential positions
+      const formattedSteps = sortedActionNodes.map((node, idx) => {
         const nodeOutEdges = edges.filter(e => e.source === node.id);
         const nodeInEdges = edges.filter(e => e.target === node.id);
 
