@@ -3,6 +3,9 @@ import { adminQuery } from '@/lib/engine/graphql';
 import { executeWorkflow } from '@/lib/engine/executor';
 import { waitUntil } from '@vercel/functions';
 
+export const maxDuration = 60; // Allow execution to run up to 60s
+
+
 export async function POST(req: Request) {
   try {
     const authHeader = req.headers.get('Authorization');
