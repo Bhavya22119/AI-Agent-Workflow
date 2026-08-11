@@ -28,7 +28,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ workflow
       query($id: uuid!) {
         workflows_by_pk(id: $id) {
           id org_id
-          workflow_steps(where: { type: { _eq: "webhook_trigger" } }) { id config }
+          workflow_triggers(where: { type: { _eq: "webhook" } }) { id config webhook_secret }
         }
       }
     `, { id: workflowId });
@@ -36,11 +36,11 @@ export async function POST(req: NextRequest, props: { params: Promise<{ workflow
     const workflow = workflowData.workflows_by_pk;
     if (!workflow) return NextResponse.json({ error: 'Workflow not found' }, { status: 404 });
     
-    const triggerNode = workflow.workflow_steps?.[0];
+    const triggerNode = workflow.workflow_triggers?.[0];
     if (!triggerNode) return NextResponse.json({ error: 'Workflow does not have a Webhook Trigger configured' }, { status: 400 });
     
     // 2. Check secret if configured
-    const expectedSecret = triggerNode.config?.webhook_secret;
+    const expectedSecret = triggerNode.webhook_secret || triggerNode.config?.webhook_secret;
     if (expectedSecret) {
       // Allow passing secret in header 'x-webhook-secret' or 'authorization' or query param 'secret'
       const providedSecret = req.headers.get('x-webhook-secret') || 
