@@ -129,23 +129,14 @@ export default function SettingsPanel({
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-zinc-700">System Prompt</label>
+              <label className="text-sm font-medium text-zinc-700">Prompt</label>
               <Textarea 
-                value={config.system_prompt || ''} 
-                onChange={(e) => handleConfigChange('system_prompt', e.target.value)}
-                placeholder="You are a helpful AI..."
-                rows={3}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-zinc-700">User Prompt</label>
-              <Textarea 
-                value={config.user_prompt || ''} 
-                onChange={(e) => handleConfigChange('user_prompt', e.target.value)}
+                value={config.prompt || ''} 
+                onChange={(e) => handleConfigChange('prompt', e.target.value)}
                 placeholder="Process this data: {{input}}"
-                rows={4}
+                rows={5}
               />
-              <p className="text-xs text-zinc-500">You can use {'{{variable}}'} syntax to inject data from previous nodes.</p>
+              <p className="text-xs text-zinc-500">You can use {'{{node_1.output.key}}'} syntax to inject data from previous nodes.</p>
             </div>
           </div>
         )}
