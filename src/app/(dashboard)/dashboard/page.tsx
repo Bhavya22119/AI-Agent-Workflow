@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useOrg } from '@/hooks/useOrg';
@@ -20,6 +21,7 @@ const DASHBOARD_QUERY = `
       id
       status
       started_at
+      workflow_id
       workflow {
         name
       }
@@ -131,17 +133,26 @@ export default function DashboardOverviewPage() {
         ) : (
           <div className="space-y-4">
             {runs.map((run: any) => (
-              <div key={run.id} className="flex items-center justify-between p-3 rounded-lg bg-zinc-100/50 border border-zinc-200">
+              <Link 
+                href={`/workflows/${run.workflow_id}`}
+                key={run.id} 
+                className="flex items-center justify-between p-3 rounded-lg bg-zinc-100/50 border border-zinc-200 hover:bg-zinc-100 hover:border-zinc-300 transition-all cursor-pointer group"
+              >
                 <div className="flex items-center gap-3">
                   <Badge status={run.status?.toLowerCase()} label={run.status} />
-                  <span className="text-sm font-medium text-zinc-900">
+                  <span className="text-sm font-medium text-zinc-900 group-hover:text-indigo-600 transition-colors">
                     {run.workflow?.name || 'Unknown Workflow'}
                   </span>
                 </div>
-                <span className="text-xs text-zinc-500">
-                  {new Date(run.started_at).toLocaleString()}
-                </span>
-              </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-xs text-zinc-500">
+                    {new Date(run.started_at).toLocaleString()}
+                  </span>
+                  <svg className="w-4 h-4 text-zinc-400 group-hover:text-indigo-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </Link>
             ))}
           </div>
         )}
