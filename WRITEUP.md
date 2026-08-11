@@ -1,122 +1,50 @@
-# Design Write-Up — AI Agent Workflow Builder
+# AI Agent Workflow Builder - Architecture Write-up
 
-## Schema Reasoning
+## 1. Schema Reasoning & Design
 
-The schema is intentionally normalized around the organization boundary. Every data table carries an `org_id` foreign key (either directly or through a parent relationship), which creates a natural partition:
+The database schema is designed to represent a scalable, multi-tenant workflow orchestration engine while ensuring strict data isolation at the organizational level.
 
-```
-organizations
-  └── org_members (user_id, role)
-  └── workflows
-        └── workflow_steps (position-ordered, typed via enum)
-        └── workflow_triggers (manual, webhook, scheduled, database_event)
-        └── workflow_runs (execution instance)
-              └── step_runs (per-step status, input, output, error, attempt_count)
-              └── workflow_outputs (db_write results)
-  └── watched_records (database event trigger source)
-```
+### Core Tables
+- **`organizations` & `org_members`**: The foundation of multi-tenancy. Everything belongs to an organization. `org_members` joins users to orgs with a specific `role` (`owner`, `editor`, `viewer`). 
+- **`workflows`**: The top-level container, tied directly to an `org_id`.
+- **`workflow_steps` & `workflow_triggers`**: Normalizing steps and triggers into separate tables enables flexible workflow configurations. Steps maintain an ordered `position` column. Triggers define how workflows start, keeping the engine decoupled from the invocation method (manual vs webhook vs cron).
+- **`workflow_runs` & `step_runs`**: Represent execution history. A run tracks overall state (`pending`, `running`, `paused`, `completed`, `failed`), while `step_runs` track granular per-node execution details (inputs, outputs, errors, attempt counts, and approval metadata). 
 
-**Why this shape:**
-- **`org_members` as the gating table** — every permission check ultimately joins through `org_members` to verify the requesting user belongs to the target org with the correct role. This makes cross-org isolation a structural guarantee, not a convention.
-- **`workflow_steps` with a `position` column** — steps execute in order. The `UNIQUE(workflow_id, position)` constraint prevents accidental duplicates.
-- **`step_runs` separate from `workflow_steps`** — a step definition is reusable across runs. Each run creates its own `step_runs` snapshot, so historical runs are preserved even if the workflow definition changes later.
-- **`workflow_outputs`** — a dedicated table for `db_write` results, scoped to org + run, so outputs are queryable and auditable.
-- **PostgreSQL enums** (`org_role`, `step_type`, `trigger_type`, `run_status`, `step_run_status`) enforce valid values at the database level, not just the application layer.
-- **`org_usage_summary` view** — a computed Postgres view that dynamically counts `workflow_runs` per org to calculate `quota_used`, `quota_remaining`, and `usage_percentage` in real-time without requiring manual counter maintenance.
+### Aggregation View
+We use a Postgres View `org_usage_summary` (which joins `organizations` with `workflow_runs`) to track and compute organization-level usage dynamically, calculating total runs and average run duration without requiring manual triggers or complex computed fields.
 
 ---
 
-## Two Permission Layers
+## 2. The Two Permission Layers
 
-### Layer 1 — Org + Role Scoping (Hasura Row-Level Permissions)
+Data security in a multi-tenant workflow engine requires more than just database row-level security. We implemented a two-layered permission model:
 
-Every table in Hasura has row-level permissions that filter through `org_members`. For example, the `workflows` table select permission for role `user`:
+### Layer 1: Row-Level Scoping (Database/Hasura Level)
+Layer 1 ensures that a user can *never* see or interact with data outside their organization, regardless of their role. This is enforced directly in Hasura's GraphQL Engine using session variables (`X-Hasura-User-Id`). 
+- When an API requests `workflows`, Hasura intercepts the query and applies a boolean expression: `workflow.org_id` must match an `org_id` where the user exists in the `org_members` table.
+- This creates airtight cross-org isolation. Even if a user guesses a valid workflow ID from another org, Hasura returns an empty set.
 
-```yaml
-filter:
-  organization:
-    org_members:
-      user_id:
-        _eq: X-Hasura-User-Id
-```
-
-This means a GraphQL query for workflows will **only return rows belonging to organizations where the calling user is a member**. Even if a user guesses a workflow ID from another org, `workflows_by_pk(id: "...")` returns `null` because the row doesn't pass the filter.
-
-Role-specific restrictions:
-- **owner** — full CRUD on workflows, steps, triggers, runs, org members
-- **editor** — can create/edit workflows and steps, can trigger runs, cannot manage org members
-- **viewer** — read-only access, `insert`/`update`/`delete` permissions are not granted
-
-These are enforced **in Hasura metadata**, not in application code — they apply to every GraphQL operation regardless of which client or endpoint is used.
-
-### Layer 2 — Step-Level Gating (Action Handler Logic)
-
-Some operations can't be expressed as simple row-level permissions:
-
-1. **Step type restrictions** — Only an `owner` can add `db_write`, `notify`, or `webhook` trigger steps. This is enforced in the frontend workflow builder UI (the dropdown options are conditionally rendered based on role). The backend Action handler provides the enforcement backstop.
-
-2. **Approval gate** — When a workflow reaches an `approval_gate` step, the executor sets `step_runs.status = 'paused'` and `workflow_runs.status = 'paused'`. The `approveStep` Action handler:
-   - Looks up the paused step run and its parent workflow run
-   - Extracts the `org_id` from the workflow run
-   - Calls `verifyOrgMembership(userId, orgId, ['owner', 'editor'])` — a server-side check against `org_members`
-   - Only if the check passes does it update the step to `completed` and resume execution
-   - This is a **mid-execution decision** that cannot be a database permission because it requires business logic (checking the approver's role, setting `approved_by`/`approved_at`, then resuming the executor from the next step position)
-
-3. **Quota enforcement** — The `triggerWorkflowRun` Action handler checks `checkQuota(orgId)` before creating a run. If `quota_used >= quota_allowed`, the run is rejected with HTTP 429. The quota is incremented on successful completion.
+### Layer 2: Step-Level Gating (API/Execution Level)
+Role-based constraints (who can add specific steps or approve runs) are mid-execution and structural decisions that cannot be easily solved by row-level read/write rules. Layer 2 is enforced in our Next.js API Routes (which act as secure custom Action handlers):
+- **Save-Time Gating:** When saving a workflow (`/api/save-workflow`), the handler queries the user's role. If an `editor` attempts to add a `db_write`, `notify`, or `webhook` trigger, the API rejects the request with a `403 Forbidden` response. Only `owner` roles can commit these restricted nodes.
+- **Run-Time Gating:** During execution, a viewer can view a workflow's progress via GraphQL subscriptions, but the backend prevents them from manually triggering it (`/api/run-workflow`) or approving it (`/api/approve-step`).
 
 ---
 
-## Approval Gate Pause/Resume Implementation
+## 3. Approval Gate: Pause & Resume Implementation
 
-The approval gate is implemented as a **cooperative pause between the executor and a separate Action handler**:
+The `approval_gate` step allows workflows to pause execution, requiring human intervention. Implementing this requires coordination between the execution engine, the database, and the frontend.
 
-### Pause (in `_utils/executor.ts`)
-```typescript
-case 'approval_gate':
-  await updateStepRunStatus(stepRun.id, 'paused', { input });
-  await updateRunStatus(workflowRunId, 'paused');
-  return; // ← exits the executor loop entirely
-```
+### Pausing the Execution
+When the orchestration engine (`executor.ts`) encounters an `approval_gate` node:
+1. It updates the `step_runs` table, changing the status to `paused`.
+2. It changes the parent `workflow_runs` status to `paused`.
+3. The engine **terminates** its current serverless function execution. It does not await a response or keep the function alive, preventing timeouts and saving compute resources.
 
-When the executor hits an `approval_gate` step, it:
-1. Sets the step_run status to `paused`
-2. Sets the overall workflow_run status to `paused`
-3. **Returns immediately** — the executor function exits, freeing the serverless function
-
-The run is now frozen in the database. The frontend subscription/polling picks up the `paused` state and shows the approval UI.
-
-### Resume (in `approve-step.ts` Action handler)
-When a user clicks "Approve":
-1. The `approveStep` Action handler receives the `step_run_id`
-2. It verifies the caller is `owner`/`editor` in the run's org (Layer 2 check)
-3. It updates the step: `status = completed`, `approved_by = userId`, `approved_at = now()`
-4. It calls `executeWorkflow(workflowRunId, stepRun.position + 1)` — this resumes the executor **from the next step position**, not from the beginning
-5. The executor picks up where it left off and continues through remaining steps
-
-This design means:
-- No long-running processes — the executor runs only while there are steps to execute
-- The pause state is durable in the database — even if the server restarts, the paused run is still there
-- Resume is idempotent — calling approve on an already-approved step returns a 409 conflict
-- Double-approval is prevented by the `where: { status: { _eq: paused } }` condition in the update mutation
-
----
-
-## Live Subscription for Step Progress
-
-The Run Viewer page uses a **GraphQL subscription** (via `graphql-ws`) to stream `step_runs` changes in real-time:
-
-```graphql
-subscription WatchStepRuns($runId: uuid!) {
-  step_runs(where: { workflow_run_id: { _eq: $runId } }, order_by: { position: asc }) {
-    id position status output error attempt_count
-    workflow_step { type config }
-  }
-}
-```
-
-The subscription connects to Hasura's WebSocket endpoint (`wss://...hasura.../v1/graphql`) with the user's JWT bearer token. When the server-side executor updates a `step_run` row (e.g., `status: pending → running → completed`), Hasura pushes the change through the WebSocket immediately — no polling delay.
-
-A separate subscription watches `workflow_runs_by_pk` for the overall run status, which is how the "paused, awaiting approval" state appears instantly.
-
-If the WebSocket connection fails (e.g., behind a restrictive proxy), the page falls back to HTTP polling as a graceful degradation. The UI shows "Live — WebSocket Subscription" or "Live — Polling" to indicate which mode is active.
-
+### Resuming the Execution
+When a user clicks "Approve" in the frontend:
+1. The frontend calls the `/api/approve-step` API route.
+2. The route verifies the user's role. It queries `org_members` to ensure the user is an `owner` or `editor` in that specific organization.
+3. If authorized, the route updates the `step_runs` record to `completed`, recording the user's ID in `approved_by` and the current timestamp in `approved_at`.
+4. It updates the `workflow_runs` status back to `running`.
+5. Finally, the route calls the `waitUntil(executeWorkflow(...))` engine function asynchronously. The engine wakes up, queries the database for the next pending step, and resumes execution seamlessly from where it left off.
