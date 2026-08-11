@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { executeWorkflow } from '@/lib/engine/executor';
+import { waitUntil } from '@vercel/functions';
 
 export const maxDuration = 60; // Allow up to 60 seconds for long workflows
 
@@ -66,22 +68,25 @@ export async function POST(req: NextRequest) {
       mutation($id: uuid!) { update_workflow_runs_by_pk(pk_columns: { id: $id }, _set: { status: running }) { id } }
     `, { id: runId });
     
-    // 5. Resume execution from next position (import executor logic inline)
+    // 5. Resume execution from next position using real executor
     const nextPos = stepRun.position + 1;
     
-    // Get remaining steps
+    // Get remaining steps to see if any are left
     const stepsData = await adminQuery(`
       query($runId: uuid!, $startPos: Int!) {
         step_runs(where: { workflow_run_id: { _eq: $runId }, position: { _gte: $startPos } }, order_by: { position: asc }) {
-          id workflow_step_id position status
-          workflow_step { type config }
+          id
         }
       }
     `, { runId, startPos: nextPos });
     
     // Execute remaining steps
     if (stepsData.step_runs?.length > 0) {
-      await executeRemainingSteps(runId, stepsData.step_runs);
+      waitUntil(
+        executeWorkflow(runId, nextPos).catch(err => {
+          console.error("Error resuming workflow:", err);
+        })
+      );
     } else {
       // No more steps — mark run completed
       await adminQuery(`
@@ -93,88 +98,5 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('approve-step API error:', error);
     return NextResponse.json({ message: error.message || 'Internal error' }, { status: 500 });
-  }
-}
-
-// Simplified executor for remaining steps after approval
-async function executeRemainingSteps(runId: string, stepRuns: any[]) {
-  const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
-  let previousOutput: any = null;
-  
-  // Get previous step output
-  const prevData = await adminQuery(`
-    query($runId: uuid!, $pos: Int!) {
-      step_runs(where: { workflow_run_id: { _eq: $runId }, position: { _lt: $pos } }, order_by: { position: desc }, limit: 1) { output }
-    }
-  `, { runId, pos: stepRuns[0].position });
-  previousOutput = prevData.step_runs?.[0]?.output || {};
-
-  for (const stepRun of stepRuns) {
-    if (stepRun.status === 'skipped') continue;
-    try {
-      await adminQuery(`mutation($id: uuid!) { update_step_runs_by_pk(pk_columns: { id: $id }, _set: { status: running, started_at: "now()" }) { id } }`, { id: stepRun.id });
-      
-      const config = stepRun.workflow_step.config || {};
-      const type = stepRun.workflow_step.type;
-      let output: any;
-
-      if (type === 'approval_gate') {
-        await adminQuery(`mutation($id: uuid!) { update_step_runs_by_pk(pk_columns: { id: $id }, _set: { status: paused }) { id } }`, { id: stepRun.id });
-        await adminQuery(`mutation($id: uuid!) { update_workflow_runs_by_pk(pk_columns: { id: $id }, _set: { status: paused }) { id } }`, { id: runId });
-        return;
-      } else if (type === 'llm_call') {
-        const prompt = config.prompt?.replace(/\{\{.*?\}\}/g, typeof previousOutput === 'object' ? JSON.stringify(previousOutput) : String(previousOutput || '')) || '';
-        if (GROQ_API_KEY) {
-          const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_API_KEY}` },
-            body: JSON.stringify({ model: config.model || 'llama-3.1-8b-instant', messages: [{ role: 'user', content: prompt }], max_tokens: 1024 }),
-          });
-          const data: any = await res.json();
-          output = { result: data.choices?.[0]?.message?.content || '', provider: 'groq' };
-        } else {
-          await new Promise(r => setTimeout(r, 1000));
-          output = { result: '[STUB] positive sentiment detected', provider: 'stub' };
-        }
-      } else if (type === 'http_request') {
-        const url = config.url || 'https://httpbin.org/get';
-        const res = await fetch(url, { method: config.method || 'GET' });
-        output = await res.json().catch(() => ({}));
-      } else if (type === 'db_write') {
-        const orgId = await adminQuery(`query($id: uuid!) { workflow_runs_by_pk(id: $id) { org_id } }`, { id: runId });
-        await adminQuery(`
-          mutation($orgId: uuid!, $runId: uuid!, $key: String!, $value: jsonb!) {
-            insert_workflow_outputs_one(object: { org_id: $orgId, workflow_run_id: $runId, key: $key, value: $value }) { id }
-          }
-        `, { orgId: orgId.workflow_runs_by_pk.org_id, runId, key: config.key || 'output', value: previousOutput || {} });
-        output = { success: true };
-      } else if (type === 'conditional_branch') {
-        const val = previousOutput?.result || previousOutput;
-        let conditionMet = false;
-        if (config.condition) {
-          if (config.condition.operator === 'contains') conditionMet = String(val).includes(String(config.condition.value));
-          else if (config.condition.operator === 'equals') conditionMet = val === config.condition.value;
-        }
-        output = { conditionMet };
-      } else {
-        output = { type, status: 'executed' };
-      }
-
-      await adminQuery(`
-        mutation($id: uuid!, $output: jsonb) { update_step_runs_by_pk(pk_columns: { id: $id }, _set: { status: completed, output: $output, completed_at: "now()" }) { id } }
-      `, { id: stepRun.id, output });
-      previousOutput = output;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      await adminQuery(`mutation($id: uuid!, $e: String) { update_step_runs_by_pk(pk_columns: { id: $id }, _set: { status: failed, error: $e }) { id } }`, { id: stepRun.id, e: msg });
-      await adminQuery(`mutation($id: uuid!) { update_workflow_runs_by_pk(pk_columns: { id: $id }, _set: { status: failed }) { id } }`, { id: runId });
-      return;
-    }
-  }
-  
-  await adminQuery(`mutation($id: uuid!) { update_workflow_runs_by_pk(pk_columns: { id: $id }, _set: { status: completed, completed_at: "now()" }) { id } }`, { id: runId });
-  const orgId = await adminQuery(`query($id: uuid!) { workflow_runs_by_pk(id: $id) { org_id } }`, { id: runId });
-  if (orgId.workflow_runs_by_pk?.org_id) {
-    await adminQuery(`mutation($orgId: uuid!) { update_organizations_by_pk(pk_columns: { id: $orgId }, _inc: { quota_used: 1 }) { id } }`, { orgId: orgId.workflow_runs_by_pk.org_id });
   }
 }
