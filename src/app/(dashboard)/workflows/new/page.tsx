@@ -1,69 +1,147 @@
 "use client";
-import { useState } from 'react';
+
+import { useState, useCallback, useRef, DragEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card } from '@/components/ui/card';
+import { 
+  ReactFlow, 
+  ReactFlowProvider, 
+  addEdge,
+  useNodesState,
+  useEdgesState,
+  Controls,
+  Background,
+  Connection,
+  Edge,
+  Node,
+  ReactFlowInstance,
+  Panel
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+
+import { useOrg } from '@/hooks/useOrg';
+import { useGraphQL } from '@/hooks/useGraphQL';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select } from '@/components/ui/select';
-import { useOrg } from '@/hooks/useOrg';
-import { useGraphQL } from '@/hooks/useGraphQL';
 
-export default function NewWorkflowPage() {
+import CustomNode from '@/components/workflow-builder/CustomNode';
+import Sidebar from '@/components/workflow-builder/Sidebar';
+import SettingsPanel from '@/components/workflow-builder/SettingsPanel';
+
+const nodeTypes = {
+  custom: CustomNode,
+};
+
+let id = 1;
+const getId = () => `node_${id++}`;
+
+export default function WorkflowBuilder() {
   const router = useRouter();
   const { role, orgId } = useOrg();
-  const [name, setName] = useState('');
-  const [desc, setDesc] = useState('');
-  const [steps, setSteps] = useState<any[]>([]);
-
-  const [triggers, setTriggers] = useState({
-    manual: false,
-    webhook: false,
-    scheduled: false,
-    database_event: false
-  });
-  const [triggerConfigs, setTriggerConfigs] = useState({
-    webhook_secret: '',
-    cron_expression: ''
-  });
-
   const { request } = useGraphQL();
+
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const [rfInstance, setRfInstance] = useState<ReactFlowInstance | null>(null);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  
+  const [name, setName] = useState('My Awesome Workflow');
+  const [desc, setDesc] = useState('');
+  
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const addStep = (type: string) => {
-    setSteps([...steps, { id: Date.now(), type, config: {} }]);
-  };
+  const onConnect = useCallback(
+    (params: Connection | Edge) => setEdges((eds) => addEdge({ ...params, animated: true }, eds)),
+    [setEdges]
+  );
 
-  const updateStepConfig = (id: number, configUpdate: any) => {
-    setSteps(steps.map(s => s.id === id ? { ...s, config: { ...s.config, ...configUpdate } } : s));
-  };
+  const onDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
 
-  const moveStepUp = (index: number) => {
-    if (index === 0) return;
-    const newSteps = [...steps];
-    [newSteps[index - 1], newSteps[index]] = [newSteps[index], newSteps[index - 1]];
-    setSteps(newSteps);
-  };
+  const onDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
 
-  const moveStepDown = (index: number) => {
-    if (index === steps.length - 1) return;
-    const newSteps = [...steps];
-    [newSteps[index + 1], newSteps[index]] = [newSteps[index], newSteps[index + 1]];
-    setSteps(newSteps);
+      const type = event.dataTransfer.getData('application/reactflow');
+      const label = event.dataTransfer.getData('application/reactflow-label');
+
+      if (typeof type === 'undefined' || !type) {
+        return;
+      }
+
+      const position = rfInstance?.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      }) || { x: 0, y: 0 };
+
+      const newNode: Node = {
+        id: getId(),
+        type: 'custom',
+        position,
+        data: { 
+          type, 
+          label,
+          config: {} 
+        },
+      };
+
+      setNodes((nds) => nds.concat(newNode));
+    },
+    [rfInstance, setNodes]
+  );
+
+  const updateNodeData = (nodeId: string, newData: any) => {
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.id === nodeId) {
+          node.data = { ...node.data, ...newData };
+        }
+        return node;
+      })
+    );
   };
 
   const handleSave = async () => {
-    if (!name || !orgId) return alert('Name and Organization required.');
-    setLoading(true);
+    if (!name || !orgId) return alert('Workflow Name is required.');
     
-    try {
-      const formattedSteps = steps.map((s, idx) => ({
-        position: idx + 1,
-        type: s.type,
-        config: s.config
-      }));
+    // Separate triggers and action steps based on node type string
+    const triggerNodes = nodes.filter(n => (n.data.type as string).includes('trigger'));
+    const actionNodes = nodes.filter(n => !(n.data.type as string).includes('trigger'));
 
-      // We use insert_workflows_one to insert workflow and nested workflow_steps together
+    if (triggerNodes.length === 0 && actionNodes.length === 0) {
+      return alert('Add at least one node to the workflow.');
+    }
+
+    setLoading(true);
+
+    try {
+      // 1. Format action nodes for workflow_steps
+      const formattedSteps = actionNodes.map((node, idx) => {
+        const nodeOutEdges = edges.filter(e => e.source === node.id);
+        const nodeInEdges = edges.filter(e => e.target === node.id);
+
+        return {
+          position: idx + 1, // Hasura requires an integer position
+          type: node.data.type,
+          config: {
+            ...((node.data.config as any) || {}),
+            ui: {
+              id: node.id,
+              x: node.position.x,
+              y: node.position.y,
+              out_edges: nodeOutEdges,
+              in_edges: nodeInEdges,
+              label: node.data.label
+            }
+          }
+        };
+      });
+
+      // 2. Insert workflow + steps
       const response = await request(`
         mutation CreateWorkflow($orgId: uuid!, $name: String!, $desc: String, $steps: [workflow_steps_insert_input!]!) {
           insert_workflows_one(object: {
@@ -81,280 +159,118 @@ export default function NewWorkflowPage() {
 
       const workflowId = response.insert_workflows_one.id;
 
-      const triggerObjects = [];
-      if (triggers.manual) {
-        triggerObjects.push({ workflow_id: workflowId, type: 'manual', config: {} });
-      }
-      if (triggers.webhook && role === 'owner') {
-        triggerObjects.push({ workflow_id: workflowId, type: 'webhook', webhook_secret: triggerConfigs.webhook_secret, config: {} });
-      }
-      if (triggers.scheduled) {
-        triggerObjects.push({ workflow_id: workflowId, type: 'scheduled', config: { cron_expression: triggerConfigs.cron_expression } });
-      }
-      if (triggers.database_event) {
-        triggerObjects.push({ workflow_id: workflowId, type: 'database_event', config: {} });
-      }
+      // 3. Format triggers
+      const triggerObjects = triggerNodes.map(node => {
+        const nodeOutEdges = edges.filter(e => e.source === node.id);
+        const config = (node.data.config as any) || {};
+        
+        let type = 'manual';
+        if (node.data.type === 'webhook_trigger') type = 'webhook';
+        if (node.data.type === 'schedule_trigger') type = 'scheduled';
+        if (node.data.type === 'db_event_trigger') type = 'database_event';
+
+        return {
+          workflow_id: workflowId,
+          type: type,
+          webhook_secret: config.webhook_secret || null,
+          config: {
+            ...config,
+            ui: {
+              id: node.id,
+              x: node.position.x,
+              y: node.position.y,
+              out_edges: nodeOutEdges,
+              label: node.data.label
+            }
+          }
+        };
+      });
 
       if (triggerObjects.length > 0) {
         await request(`
           mutation AddTriggers($objects: [workflow_triggers_insert_input!]!) {
-            insert_workflow_triggers(objects: $objects) { affected_rows }
+            insert_workflow_triggers(objects: $objects) {
+              affected_rows
+            }
           }
         `, { objects: triggerObjects });
       }
 
       router.push('/workflows');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to save workflow.');
+      alert('Failed to save workflow: ' + err.message);
     } finally {
       setLoading(false);
     }
   };
 
+  const selectedNode = nodes.find(n => n.id === selectedNodeId) || null;
+
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-12">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-zinc-900">Create Workflow</h1>
-        <Button onClick={handleSave} disabled={loading}>{loading ? 'Saving...' : 'Save Workflow'}</Button>
+    <div className="flex flex-col h-[calc(100vh-4rem)] bg-zinc-50 overflow-hidden">
+      {/* Top Header */}
+      <div className="h-14 border-b border-zinc-200 bg-white flex items-center justify-between px-6 shrink-0 z-10 shadow-sm">
+        <div className="flex items-center gap-4 flex-1">
+          <Input 
+            value={name} 
+            onChange={(e) => setName(e.target.value)}
+            className="w-64 font-semibold border-transparent hover:border-zinc-200 focus:border-indigo-500 bg-transparent text-lg shadow-none px-2"
+            placeholder="Workflow Name"
+          />
+          <Input 
+            value={desc} 
+            onChange={(e) => setDesc(e.target.value)}
+            className="w-96 border-transparent hover:border-zinc-200 focus:border-indigo-500 bg-transparent text-sm text-zinc-500 shadow-none px-2"
+            placeholder="Add description..."
+          />
+        </div>
+        <div className="flex items-center gap-3">
+          <Button variant="secondary" onClick={() => router.back()}>Cancel</Button>
+          <Button onClick={handleSave} disabled={loading} className="bg-indigo-600 hover:bg-indigo-700">
+            {loading ? 'Saving...' : 'Save Workflow'}
+          </Button>
+        </div>
       </div>
 
-      <Card className="space-y-4">
-        <h2 className="text-xl font-semibold">General</h2>
-        <div>
-          <label className="block text-sm font-medium text-zinc-600 mb-1">Name</label>
-          <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Weekly Report Generator" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-zinc-600 mb-1">Description</label>
-          <Textarea value={desc} onChange={e => setDesc(e.target.value)} />
-        </div>
-      </Card>
-
-      <Card className="space-y-4">
-        <h2 className="text-xl font-semibold">Triggers</h2>
-        <div className="space-y-3">
-          <label className="flex items-center space-x-2 text-zinc-600">
-            <input 
-              type="checkbox" 
-              checked={triggers.manual} 
-              onChange={e => setTriggers({ ...triggers, manual: e.target.checked })} 
-            />
-            <span>Manual</span>
-          </label>
-          
-          {role === 'owner' && (
-            <div className="space-y-2">
-              <label className="flex items-center space-x-2 text-zinc-600">
-                <input 
-                  type="checkbox" 
-                  checked={triggers.webhook} 
-                  onChange={e => setTriggers({ ...triggers, webhook: e.target.checked })} 
-                />
-                <span>Webhook</span>
-              </label>
-              {triggers.webhook && (
-                <div className="pl-6">
-                  <Input 
-                    placeholder="Webhook Secret" 
-                    value={triggerConfigs.webhook_secret}
-                    onChange={e => setTriggerConfigs({ ...triggerConfigs, webhook_secret: e.target.value })}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <label className="flex items-center space-x-2 text-zinc-600">
-              <input 
-                type="checkbox" 
-                checked={triggers.scheduled} 
-                onChange={e => setTriggers({ ...triggers, scheduled: e.target.checked })} 
+      {/* Builder Workspace */}
+      <div className="flex flex-1 overflow-hidden relative">
+        <Sidebar role={role} />
+        
+        <div className="flex-1 h-full" ref={reactFlowWrapper}>
+          <ReactFlowProvider>
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onInit={setRfInstance}
+              onDrop={onDrop}
+              onDragOver={onDragOver}
+              nodeTypes={nodeTypes}
+              onNodeClick={(_, node) => setSelectedNodeId(node.id)}
+              onPaneClick={() => setSelectedNodeId(null)}
+              fitView
+              className="bg-zinc-50"
+              defaultEdgeOptions={{ 
+                type: 'smoothstep', 
+                animated: true,
+                style: { strokeWidth: 2, stroke: '#94a3b8' }
+              }}
+            >
+              <Background color="#cbd5e1" gap={24} size={2} />
+              <Controls className="bg-white border-zinc-200 shadow-md rounded-lg overflow-hidden" />
+              
+              <SettingsPanel 
+                selectedNode={selectedNode}
+                onUpdate={updateNodeData}
+                onClose={() => setSelectedNodeId(null)}
               />
-              <span>Scheduled</span>
-            </label>
-            {triggers.scheduled && (
-              <div className="pl-6">
-                <Input 
-                  placeholder="Cron Expression (e.g. 0 0 * * *)" 
-                  value={triggerConfigs.cron_expression}
-                  onChange={e => setTriggerConfigs({ ...triggerConfigs, cron_expression: e.target.value })}
-                />
-              </div>
-            )}
-          </div>
-
-          <label className="flex items-center space-x-2 text-zinc-600">
-            <input 
-              type="checkbox" 
-              checked={triggers.database_event} 
-              onChange={e => setTriggers({ ...triggers, database_event: e.target.checked })} 
-            />
-            <span>Database Event</span>
-          </label>
+            </ReactFlow>
+          </ReactFlowProvider>
         </div>
-      </Card>
-
-      <Card className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold">Steps</h2>
-          <Select className="w-48" onChange={(e) => { if(e.target.value) { addStep(e.target.value); e.target.value=''; } }}>
-            <option value="">+ Add Step</option>
-            <option value="llm_call">LLM Call</option>
-            <option value="http_request">HTTP Request</option>
-            {role === 'owner' && <option value="db_write">DB Write (Owner)</option>}
-            {role === 'owner' && <option value="notify">Notify (Owner)</option>}
-            <option value="conditional_branch">Conditional</option>
-            <option value="approval_gate">Approval Gate</option>
-          </Select>
-        </div>
-
-        <div className="space-y-4">
-          {steps.map((step, idx) => (
-            <div key={step.id} className="p-4 bg-zinc-100/50 border border-zinc-200 rounded-lg relative group">
-              <div className="absolute top-4 right-4 flex space-x-2">
-                <button 
-                  onClick={() => moveStepUp(idx)}
-                  disabled={idx === 0}
-                  className="text-zinc-500 hover:text-zinc-900 disabled:opacity-30 transition-colors"
-                >
-                  ↑
-                </button>
-                <button 
-                  onClick={() => moveStepDown(idx)}
-                  disabled={idx === steps.length - 1}
-                  className="text-zinc-500 hover:text-zinc-900 disabled:opacity-30 transition-colors"
-                >
-                  ↓
-                </button>
-                <button 
-                  onClick={() => setSteps(steps.filter(s => s.id !== step.id))}
-                  className="text-zinc-500 hover:text-rose-600 transition-colors ml-2"
-                >
-                  ✕
-                </button>
-              </div>
-              
-              <div className="flex items-center space-x-3 mb-4">
-                <span className="w-6 h-6 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-full text-xs font-bold">
-                  {idx + 1}
-                </span>
-                <span className="text-sm font-medium text-zinc-900 px-2 py-1 bg-zinc-200 rounded">
-                  {step.type}
-                </span>
-              </div>
-              
-              <div className="space-y-3">
-                {step.type === 'llm_call' && (
-                  <>
-                    <Textarea 
-                      placeholder="Prompt template..." 
-                      value={step.config.prompt || ''} 
-                      onChange={e => updateStepConfig(step.id, { prompt: e.target.value })} 
-                    />
-                    <Input 
-                      placeholder="Model (e.g. llama3-8b-8192)" 
-                      value={step.config.model || ''} 
-                      onChange={e => updateStepConfig(step.id, { model: e.target.value })} 
-                    />
-                  </>
-                )}
-                {step.type === 'http_request' && (
-                  <>
-                    <Input 
-                      placeholder="URL" 
-                      value={step.config.url || ''} 
-                      onChange={e => updateStepConfig(step.id, { url: e.target.value })} 
-                    />
-                    <Select value={step.config.method || 'GET'} onChange={e => updateStepConfig(step.id, { method: e.target.value })}>
-                      <option value="GET">GET</option>
-                      <option value="POST">POST</option>
-                    </Select>
-                  </>
-                )}
-                {step.type === 'approval_gate' && (
-                  <Textarea 
-                    placeholder="Message for approver..." 
-                    value={step.config.message || ''} 
-                    onChange={e => updateStepConfig(step.id, { message: e.target.value })} 
-                  />
-                )}
-                {step.type === 'db_write' && (
-                  <>
-                    <Input 
-                      placeholder="Output Key" 
-                      value={step.config.key || ''} 
-                      onChange={e => updateStepConfig(step.id, { key: e.target.value })} 
-                    />
-                    <Input 
-                      placeholder="Value Template (e.g. {{prev_output}})" 
-                      value={step.config.value_template || ''} 
-                      onChange={e => updateStepConfig(step.id, { value_template: e.target.value })} 
-                    />
-                  </>
-                )}
-                {step.type === 'notify' && (
-                  <>
-                    <Input 
-                      placeholder="Channel (e.g. #general, email@example.com)" 
-                      value={step.config.channel || ''} 
-                      onChange={e => updateStepConfig(step.id, { channel: e.target.value })} 
-                    />
-                    <Textarea 
-                      placeholder="Message content..." 
-                      value={step.config.message || ''} 
-                      onChange={e => updateStepConfig(step.id, { message: e.target.value })} 
-                    />
-                  </>
-                )}
-                {step.type === 'conditional_branch' && (
-                  <>
-                    <Input 
-                      placeholder="Condition Path (e.g. output.status)" 
-                      value={step.config.condition_path || ''} 
-                      onChange={e => updateStepConfig(step.id, { condition_path: e.target.value })} 
-                    />
-                    <Select 
-                      value={step.config.operator || ''}
-                      onChange={e => updateStepConfig(step.id, { operator: e.target.value })}
-                    >
-                      <option value="">Select Operator</option>
-                      <option value="===">Equals (===)</option>
-                      <option value="!==">Not Equals (!==)</option>
-                      <option value=">">Greater Than (&gt;)</option>
-                      <option value="<">Less Than (&lt;)</option>
-                      <option value="contains">Contains</option>
-                    </Select>
-                    <Input 
-                      placeholder="Value to compare against" 
-                      value={step.config.value || ''} 
-                      onChange={e => updateStepConfig(step.id, { value: e.target.value })} 
-                    />
-                    <div className="flex space-x-2">
-                      <Input 
-                        type="number"
-                        placeholder="True Next (Position)" 
-                        value={step.config.true_next || ''} 
-                        onChange={e => updateStepConfig(step.id, { true_next: parseInt(e.target.value) || e.target.value })} 
-                      />
-                      <Input 
-                        type="number"
-                        placeholder="False Next (Position)" 
-                        value={step.config.false_next || ''} 
-                        onChange={e => updateStepConfig(step.id, { false_next: parseInt(e.target.value) || e.target.value })} 
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          ))}
-          {steps.length === 0 && (
-            <div className="text-center py-8 text-zinc-500 italic">No steps added yet.</div>
-          )}
-        </div>
-      </Card>
+      </div>
     </div>
   );
 }
