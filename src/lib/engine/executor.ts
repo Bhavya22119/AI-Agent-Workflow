@@ -92,8 +92,28 @@ function interpolate(template: string, input: any, stepRuns: StepRun[]): string 
   if (!template) return '';
   return template.replace(/{{(.*?)}}/g, (match, key) => {
     key = key.trim();
-    if (key === 'input') return typeof input === 'object' ? JSON.stringify(input) : String(input);
-    if (key === 'prev_output') return typeof input === 'object' ? JSON.stringify(input) : String(input);
+    
+    // Support dot notation like input.quote or input.author
+    if (key.startsWith('input.') || key.startsWith('prev_output.')) {
+      const parts = key.split('.');
+      // Remove 'input' or 'prev_output' prefix
+      parts.shift();
+      
+      let val = input;
+      for (const part of parts) {
+        if (val && typeof val === 'object' && part in val) {
+          val = val[part];
+        } else {
+          return match; // return un-interpolated if path is invalid
+        }
+      }
+      return typeof val === 'object' ? JSON.stringify(val) : String(val);
+    }
+    
+    if (key === 'input' || key === 'prev_output') {
+      return typeof input === 'object' ? JSON.stringify(input) : String(input);
+    }
+    
     return match;
   });
 }
