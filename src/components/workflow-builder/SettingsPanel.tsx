@@ -174,57 +174,17 @@ export default function SettingsPanel({
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-zinc-700">Headers (JSON)</label>
-              <Textarea 
-                value={config.headers || ''} 
-                onChange={(e) => handleConfigChange('headers', e.target.value)}
-                placeholder='{"Authorization": "Bearer token"}'
-                className="font-mono text-xs"
-                rows={3}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-zinc-700">Body (JSON)</label>
-              <Textarea 
-                value={config.body || ''} 
-                onChange={(e) => handleConfigChange('body', e.target.value)}
-                placeholder='{"key": "value"}'
-                className="font-mono text-xs"
-                rows={4}
-              />
-            </div>
           </div>
         )}
 
         {data.type === 'conditional_branch' && (
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-zinc-700">Condition Path</label>
+              <label className="text-sm font-medium text-zinc-700">Condition (Expression)</label>
               <Input 
                 value={config.condition_path || ''} 
                 onChange={(e) => handleConfigChange('condition_path', e.target.value)}
-                placeholder="e.g. output.status"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-zinc-700">Operator</label>
-              <Select 
-                value={config.operator || 'equals'} 
-                onChange={(e) => handleConfigChange('operator', e.target.value)}
-              >
-                <option value="equals">Equals (==)</option>
-                <option value="not_equals">Not Equals (!=)</option>
-                <option value="contains">Contains</option>
-                <option value="greater_than">Greater Than (&gt;)</option>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-zinc-700">Value</label>
-              <Input 
-                value={config.value || ''} 
-                onChange={(e) => handleConfigChange('value', e.target.value)}
-                placeholder="Value to compare against"
+                placeholder="e.g. quote.length > 50"
               />
             </div>
           </div>
