@@ -72,6 +72,20 @@ export default function MembersPage() {
   if (loading) return <div>Loading members...</div>;
   if (error) return <div className="text-red-500">Error: {error}</div>;
 
+  const isOwner = currentRole === 'owner';
+
+  if (!isOwner) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="text-4xl">🔒</div>
+          <h1 className="text-2xl font-bold text-zinc-900">Access Restricted</h1>
+          <p className="text-zinc-500">Only organization owners can view and manage members.</p>
+        </div>
+      </div>
+    );
+  }
+
   const activeMembers = members.filter(m => m.role !== 'pending');
   const pendingMembers = members.filter(m => m.role === 'pending');
 

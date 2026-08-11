@@ -39,6 +39,9 @@ export default function LoginPage() {
       <p className="mt-4 text-center text-sm text-slate-400">
         Don't have an account? <Link href="/signup" className="text-indigo-400 hover:text-indigo-300">Sign up</Link>
       </p>
+      <p className="mt-2 text-center text-sm text-slate-400">
+        <Link href="/forgot-password" className="text-indigo-400 hover:text-indigo-300">Forgot your password?</Link>
+      </p>
     </Card>
   );
 }
