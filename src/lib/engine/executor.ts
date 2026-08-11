@@ -147,7 +147,9 @@ async function executeNotify(config: any, input: any, workflowRunId: string): Pr
     mutation Notify($orgId: uuid!, $runId: uuid!, $key: String!, $value: jsonb!) {
       insert_workflow_outputs_one(object: { org_id: $orgId, workflow_run_id: $runId, key: $key, value: $value }) { id }
     }
-  `, { orgId, runId: workflowRunId, key: 'notify_' + (config.channel || 'default'), value: input });
+  `, { orgId, runId: workflowRunId, key: 'notify_' + (config.channel || 'default'), value: { message: config.message, recipient: config.recipient, input } });
+
+  console.log(`[SIMULATED EMAIL] Sent to ${config.recipient || 'unknown'}: ${config.message || ''}`);
   return { success: true };
 }
 
