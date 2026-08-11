@@ -22,13 +22,14 @@ async function updateRunStatus(id: string, status: string) {
 }
 
 async function updateStepRunStatus(id: string, status: string, updates: any = {}) {
+  const { incrementAttempt, ...gqlVars } = updates;
   await adminQuery(`
     mutation UpdateStepRun($id: uuid!, $status: step_run_status!, $input: jsonb, $output: jsonb, $error: String) {
       update_step_runs_by_pk(pk_columns: { id: $id }, _set: { status: $status, input: $input, output: $output, error: $error }) { id }
     }
-  `, { id, status, ...updates });
+  `, { id, status, ...gqlVars });
   
-  if (updates.incrementAttempt) {
+  if (incrementAttempt) {
     await adminQuery(`
       mutation IncAttempt($id: uuid!) {
         update_step_runs_by_pk(pk_columns: { id: $id }, _inc: { attempt_count: 1 }) { id }
@@ -99,10 +100,13 @@ function interpolate(template: string, input: any, stepRuns: StepRun[]): string 
 
 async function executeLLMCall(config: any, input: any, stepRunId: string): Promise<any> {
   const prompt = interpolate(config.prompt || '', input, []);
+  let model = config.model || 'llama-3.1-8b-instant';
+  if (model === 'llama3-8b-8192') model = 'llama-3.1-8b-instant';
+  
   let attempt = 0;
   while (attempt < 2) {
     try {
-      const res = await callLLM(prompt, config.model);
+      const res = await callLLM(prompt, model);
       return res;
     } catch (err: any) {
       attempt++;

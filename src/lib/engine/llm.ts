@@ -1,7 +1,7 @@
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
-export async function callLLM(prompt: string, model: string = 'llama3-8b-8192'): Promise<{ result: string; provider: string }> {
+export async function callLLM(prompt: string, model: string = 'llama-3.1-8b-instant'): Promise<{ result: string; provider: string }> {
   if (GROQ_API_KEY) {
     return callGroq(prompt, model);
   }
