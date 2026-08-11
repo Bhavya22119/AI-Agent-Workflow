@@ -13,8 +13,7 @@ export default function LoginPage() {
   const { signInEmailPassword, isLoading, error } = useSignInEmailPassword();
   const router = useRouter();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = async () => {
     const { isSuccess } = await signInEmailPassword(email, password);
     if (isSuccess) window.location.href = '/workflows';
   };
@@ -22,20 +21,20 @@ export default function LoginPage() {
   return (
     <Card className="p-8">
       <h1 className="text-2xl font-bold text-center mb-6 text-zinc-900">Welcome Back</h1>
-      <form onSubmit={handleLogin} className="space-y-4">
+      <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-zinc-600 mb-1">Email</label>
-          <Input type="email" value={email} onChange={e => setEmail(e.target.value)} required />
+          <Input type="email" value={email} onChange={e => setEmail(e.target.value)} />
         </div>
         <div>
           <label className="block text-sm font-medium text-zinc-600 mb-1">Password</label>
-          <Input type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+          <Input type="password" value={password} onChange={e => setPassword(e.target.value)} />
         </div>
         {error && <p className="text-rose-500 text-sm">{error.message}</p>}
-        <Button type="submit" className="w-full" disabled={isLoading}>
+        <Button onClick={handleLogin} className="w-full" disabled={isLoading || !email || !password}>
           {isLoading ? 'Signing in...' : 'Sign In'}
         </Button>
-      </form>
+      </div>
       <p className="mt-4 text-center text-sm text-zinc-500">
         Don't have an account? <Link href="/signup" className="text-blue-600 hover:text-blue-700">Sign up</Link>
       </p>
