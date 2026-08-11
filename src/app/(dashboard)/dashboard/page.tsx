@@ -134,7 +134,7 @@ export default function DashboardOverviewPage() {
           <div className="space-y-4">
             {runs.map((run: any) => (
               <Link 
-                href={`/workflows/${run.workflow_id}`}
+                href={`/workflows/${run.workflow_id}/runs/${run.id}`}
                 key={run.id} 
                 className="flex items-center justify-between p-3 rounded-lg bg-zinc-100/50 border border-zinc-200 hover:bg-zinc-100 hover:border-zinc-300 transition-all cursor-pointer group"
               >
