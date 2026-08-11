@@ -32,7 +32,7 @@ export default function ForgotPasswordPage() {
           </p>
           <div className="pt-4">
             <Link href="/login">
-              <Button variant="outline" className="w-full text-zinc-700">
+              <Button variant="secondary" className="w-full text-zinc-700">
                 Back to Log in
               </Button>
             </Link>
