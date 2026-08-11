@@ -63,12 +63,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="flex h-screen overflow-hidden bg-zinc-50">
       <aside className="w-64 border-r border-zinc-200 bg-white flex flex-col shadow-sm">
         <div className="h-16 flex items-center px-6 border-b border-zinc-200">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-zinc-900 flex items-center justify-center">
-              <span className="text-white font-bold">🤖</span>
-            </div>
-            <span className="font-bold text-zinc-900 tracking-tight">AgentFlow</span>
-          </div>
+          <Link href="/dashboard" className="flex items-center gap-2 cursor-pointer group">
+            <span className="font-bold text-zinc-900 text-2xl tracking-tight transition-colors group-hover:text-indigo-600" style={{ fontFamily: 'cursive' }}>AgentFlow</span>
+          </Link>
         </div>
         
         <nav className="flex-1 py-4 px-3 space-y-1">
@@ -90,7 +87,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           })}
         </nav>
         <div className="p-4 border-t border-zinc-200">
-          <button onClick={() => signOut()} className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors">
+          <button 
+            onClick={async () => {
+              await signOut();
+              router.push('/login');
+            }} 
+            className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors w-full text-left cursor-pointer py-2 px-3 rounded-md hover:bg-zinc-50"
+          >
             Log out
           </button>
         </div>
