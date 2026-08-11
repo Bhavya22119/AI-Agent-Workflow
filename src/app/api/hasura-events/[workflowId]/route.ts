@@ -1,0 +1,113 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { executeWorkflow } from '@/lib/engine/executor';
+import { waitUntil } from '@vercel/functions';
+
+export const maxDuration = 60;
+
+const GRAPHQL_URL = `https://${process.env.NEXT_PUBLIC_NHOST_SUBDOMAIN}.hasura.${process.env.NEXT_PUBLIC_NHOST_REGION || 'ap-south-1'}.nhost.run/v1/graphql`;
+const ADMIN_SECRET = process.env.NHOST_ADMIN_SECRET || process.env.HASURA_GRAPHQL_ADMIN_SECRET || '';
+
+async function adminQuery(query: string, variables?: Record<string, unknown>) {
+  const response = await fetch(GRAPHQL_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-hasura-admin-secret': ADMIN_SECRET },
+    body: JSON.stringify({ query, variables }),
+  });
+  const json: any = await response.json();
+  if (json.errors) throw new Error(json.errors[0].message);
+  return json.data;
+}
+
+export async function POST(req: NextRequest, { params }: { params: { workflowId: string } }) {
+  try {
+    const { workflowId } = params;
+    
+    // 1. Get the workflow and its triggers
+    const workflowData = await adminQuery(`
+      query($id: uuid!) {
+        workflows_by_pk(id: $id) {
+          id org_id
+          workflow_steps(where: { type: { _eq: "db_event_trigger" } }) { id config }
+        }
+      }
+    `, { id: workflowId });
+    
+    const workflow = workflowData.workflows_by_pk;
+    if (!workflow) return NextResponse.json({ error: 'Workflow not found' }, { status: 404 });
+    
+    const triggerNode = workflow.workflow_steps?.[0];
+    if (!triggerNode) return NextResponse.json({ error: 'Workflow does not have a DB Event Trigger configured' }, { status: 400 });
+    
+    // 2. Check secret if configured
+    const expectedSecret = triggerNode.config?.webhook_secret;
+    if (expectedSecret) {
+      const providedSecret = req.headers.get('x-hasura-webhook-secret') || 
+                             req.headers.get('authorization')?.replace('Bearer ', '') ||
+                             req.nextUrl.searchParams.get('secret');
+                             
+      if (providedSecret !== expectedSecret) {
+        return NextResponse.json({ error: 'Unauthorized: Invalid webhook secret' }, { status: 401 });
+      }
+    }
+    
+    // 3. Extract Hasura payload
+    let rawPayload: any = {};
+    try {
+      rawPayload = await req.json();
+    } catch (e) {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+    
+    // Clean up payload (prioritize event.data.new)
+    let payload = rawPayload;
+    if (rawPayload.event && rawPayload.event.data) {
+      payload = rawPayload.event.data.new || rawPayload.event.data.old || rawPayload;
+      // Add operation type for convenience
+      if (rawPayload.event.op) payload._op = rawPayload.event.op;
+      if (rawPayload.table?.name) payload._table = rawPayload.table.name;
+    }
+    
+    // 4. Create Run
+    const runData = await adminQuery(`
+      mutation CreateRun($orgId: uuid!, $workflowId: uuid!, $context: jsonb!) {
+        insert_workflow_runs_one(object: { org_id: $orgId, workflow_id: $workflowId, status: pending, context: $context }) { id }
+      }
+    `, { orgId: workflow.org_id, workflowId: workflow.id, context: payload });
+    
+    const workflowRunId = runData.insert_workflow_runs_one.id;
+    
+    // 5. Create Step Runs
+    const stepsData = await adminQuery(`
+      query($workflowId: uuid!) {
+        workflow_steps(where: { workflow_id: { _eq: $workflowId } }, order_by: { position: asc }) { id position }
+      }
+    `, { workflowId });
+    
+    const stepRunObjects = (stepsData.workflow_steps || []).map((step: any) => ({
+      workflow_run_id: workflowRunId,
+      workflow_step_id: step.id,
+      position: step.position,
+      status: 'pending',
+    }));
+    
+    if (stepRunObjects.length > 0) {
+      await adminQuery(`
+        mutation CreateStepRuns($objects: [step_runs_insert_input!]!) {
+          insert_step_runs(objects: $objects) { affected_rows }
+        }
+      `, { objects: stepRunObjects });
+    }
+    
+    // 6. Execute asynchronously
+    waitUntil(
+      executeWorkflow(workflowRunId, 1).catch(err => {
+        console.error('DB Event execution failed:', err);
+      })
+    );
+    
+    return NextResponse.json({ success: true, workflow_run_id: workflowRunId });
+  } catch (error: any) {
+    console.error('DB Event Error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
+}
