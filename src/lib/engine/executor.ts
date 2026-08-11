@@ -1,5 +1,6 @@
 import { adminQuery } from './graphql';
 import { callLLM } from './llm';
+import nodemailer from 'nodemailer';
 
 export interface StepRun {
   id: string;
@@ -154,7 +155,6 @@ async function executeNotify(config: any, input: any, workflowRunId: string): Pr
   
   if (smtpEmail && smtpPassword) {
     try {
-      const nodemailer = await import('nodemailer');
       const transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
@@ -174,9 +174,11 @@ async function executeNotify(config: any, input: any, workflowRunId: string): Pr
       console.log(`[SMTP EMAIL] Successfully sent to ${config.recipient}`);
     } catch (err: any) {
       console.error(`[SMTP EMAIL FAILED] Error:`, err);
+      throw new Error(`SMTP Error: ${err.message}`);
     }
   } else {
     console.log(`[SIMULATED EMAIL] (SMTP_EMAIL not found) Sent to ${config.recipient || 'unknown'}: ${config.message || ''}`);
+    throw new Error('SMTP_EMAIL or SMTP_PASSWORD is not configured in environment variables.');
   }
 
   return { success: true };
