@@ -14,8 +14,8 @@ export default function LoginPage() {
   const router = useRouter();
 
   const handleLogin = async () => {
-    const { isSuccess } = await signInEmailPassword(email, password);
-    if (isSuccess) window.location.href = '/workflows';
+    const result = await signInEmailPassword(email, password);
+    if (!result.error) window.location.href = '/workflows';
   };
 
   return (

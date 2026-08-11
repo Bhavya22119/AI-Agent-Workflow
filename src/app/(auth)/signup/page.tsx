@@ -14,8 +14,8 @@ export default function SignupPage() {
   const router = useRouter();
 
   const handleSignup = async () => {
-    const { isSuccess } = await signUpEmailPassword(email, password);
-    if (isSuccess) window.location.href = '/onboarding';
+    const result = await signUpEmailPassword(email, password);
+    if (!result.error) window.location.href = '/onboarding';
   };
 
   return (
