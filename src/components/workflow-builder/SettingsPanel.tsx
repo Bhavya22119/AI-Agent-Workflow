@@ -118,17 +118,6 @@ export default function SettingsPanel({
         {data.type === 'llm_call' && (
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-zinc-700">Model</label>
-              <Select 
-                value={config.model || 'llama-3'} 
-                onChange={(e) => handleConfigChange('model', e.target.value)}
-              >
-                <option value="llama-3">Llama 3 (Meta)</option>
-                <option value="gpt-4o">GPT-4o (OpenAI)</option>
-                <option value="claude-3">Claude 3 (Anthropic)</option>
-              </Select>
-            </div>
-            <div className="space-y-2">
               <label className="text-sm font-medium text-zinc-700">Prompt</label>
               <Textarea 
                 value={config.prompt || ''} 

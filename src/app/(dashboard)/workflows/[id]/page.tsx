@@ -315,6 +315,31 @@ export default function WorkflowDetailPage() {
     }
   };
 
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!workflow || !confirm('Are you sure you want to delete this workflow? This action cannot be undone.')) return;
+    setDeleting(true);
+    try {
+      const token = nhost.auth.getAccessToken();
+      const res = await fetch('/api/delete-workflow', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ workflowId: workflow.id, orgId: workflow.org_id })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete workflow');
+      
+      router.push('/dashboard');
+    } catch (err: any) {
+      alert(err.message);
+      setDeleting(false);
+    }
+  };
+
   if (loading) {
     return <div className="p-8 flex items-center justify-center text-zinc-500">Loading Workflow...</div>;
   }
@@ -338,14 +363,24 @@ export default function WorkflowDetailPage() {
         <div className="flex items-center gap-3">
           <Button variant="secondary" onClick={() => router.back()}>Back</Button>
           {canEdit && (
-            <Button 
-              onClick={handleSave} 
-              disabled={saving} 
-              variant="secondary"
-              className="border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
-            >
-              {saving ? 'Saving...' : 'Save Changes'}
-            </Button>
+            <>
+              <Button 
+                onClick={handleDelete} 
+                disabled={deleting} 
+                variant="secondary"
+                className="border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100"
+              >
+                {deleting ? 'Deleting...' : 'Delete Workflow'}
+              </Button>
+              <Button 
+                onClick={handleSave} 
+                disabled={saving} 
+                variant="secondary"
+                className="border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
+              >
+                {saving ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </>
           )}
           <Button 
             onClick={handleRun} 
