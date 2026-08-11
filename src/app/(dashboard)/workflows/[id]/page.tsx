@@ -261,20 +261,26 @@ export default function WorkflowDetailPage() {
         };
       });
 
-      // 3. Update Workflow (Delete old steps/triggers, insert new ones)
-      await request(`
-        mutation UpdateWorkflow(
-          $workflowId: uuid!, 
-          $steps: [workflow_steps_insert_input!]!, 
-          $triggers: [workflow_triggers_insert_input!]!
-        ) {
-          delete_workflow_steps(where: { workflow_id: { _eq: $workflowId } }) { affected_rows }
-          delete_workflow_triggers(where: { workflow_id: { _eq: $workflowId } }) { affected_rows }
-          
-          insert_workflow_steps(objects: $steps) { affected_rows }
-          insert_workflow_triggers(objects: $triggers) { affected_rows }
-        }
-      `, { workflowId: workflow.id, steps: formattedSteps, triggers: triggerObjects });
+      // 3. Update Workflow using API route (bypasses Hasura metadata sync issues)
+      const token = nhost.auth.getAccessToken();
+      const saveRes = await fetch('/api/save-workflow', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          workflowId: workflow.id,
+          orgId: workflow.org_id,
+          steps: formattedSteps,
+          triggers: triggerObjects
+        })
+      });
+
+      const saveData = await saveRes.json();
+      if (!saveRes.ok) {
+        throw new Error(saveData.error || 'Failed to save workflow');
+      }
 
       alert('Workflow saved successfully!');
     } catch (err: any) {
@@ -289,7 +295,7 @@ export default function WorkflowDetailPage() {
     setTriggering(true);
     try {
       const token = nhost.auth.getAccessToken();
-      const res = await fetch(`https://${process.env.NEXT_PUBLIC_NHOST_SUBDOMAIN}.functions.${process.env.NEXT_PUBLIC_NHOST_REGION}.nhost.run/v1/trigger-workflow`, {
+      const res = await fetch(`https://${process.env.NEXT_PUBLIC_NHOST_SUBDOMAIN}.functions.${process.env.NEXT_PUBLIC_NHOST_REGION}.nhost.run/v1/trigger-workflow-run`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
