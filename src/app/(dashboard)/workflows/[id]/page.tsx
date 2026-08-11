@@ -177,16 +177,17 @@ export default function WorkflowDetailPage() {
             nodesDraggable={false}
             nodesConnectable={false}
             elementsSelectable={true}
-            className="bg-zinc-50"
+            colorMode="dark"
+            className="bg-zinc-950"
             defaultEdgeOptions={{ 
               type: 'smoothstep', 
               animated: true,
-              style: { strokeWidth: 2, stroke: '#94a3b8' }
+              style: { strokeWidth: 2, stroke: '#818cf8' }
             }}
-            connectionLineStyle={{ stroke: '#6366f1', strokeWidth: 2 }}
+            connectionLineStyle={{ stroke: '#818cf8', strokeWidth: 2 }}
           >
-            <Background color="#cbd5e1" gap={24} size={2} />
-            <Controls className="bg-white border-zinc-200 shadow-md rounded-lg overflow-hidden" />
+            <Background color="#3f3f46" gap={24} size={2} />
+            <Controls className="bg-zinc-900 border-zinc-800 fill-white shadow-md rounded-lg overflow-hidden" />
           </ReactFlow>
         </ReactFlowProvider>
       </div>

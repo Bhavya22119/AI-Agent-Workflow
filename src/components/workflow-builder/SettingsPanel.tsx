@@ -1,4 +1,4 @@
-import { X } from 'lucide-react';
+import { X, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -7,11 +7,13 @@ import { Node } from '@xyflow/react';
 
 export default function SettingsPanel({ 
   selectedNode, 
-  onUpdate, 
+  onUpdate,
+  onDelete,
   onClose 
 }: { 
   selectedNode: Node | null, 
   onUpdate: (id: string, data: any) => void,
+  onDelete?: (id: string) => void,
   onClose: () => void 
 }) {
   if (!selectedNode) return null;
@@ -37,9 +39,16 @@ export default function SettingsPanel({
           <h3 className="font-semibold text-zinc-900">Node Settings</h3>
           <p className="text-xs text-zinc-500 font-mono mt-0.5">{id}</p>
         </div>
-        <button onClick={onClose} className="p-1 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-md transition-colors">
-          <X className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          {onDelete && (
+            <button onClick={() => onDelete(id)} className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-md transition-colors" title="Delete Node">
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+          <button onClick={onClose} className="p-1.5 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-md transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">

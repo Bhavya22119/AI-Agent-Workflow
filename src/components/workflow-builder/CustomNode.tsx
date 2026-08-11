@@ -55,8 +55,8 @@ export default function CustomNode({ data, isConnectable, selected }: { data: No
 
   return (
     <div className={cn(
-      "flex items-center min-w-[240px] bg-white border rounded-xl shadow-sm transition-all relative group",
-      selected ? "border-indigo-500 shadow-md ring-1 ring-indigo-500/20" : "border-zinc-200 hover:border-zinc-300 hover:shadow-md",
+      "flex items-center min-w-[240px] bg-zinc-900 border rounded-xl shadow-sm transition-all relative group",
+      selected ? "border-indigo-500 shadow-md ring-1 ring-indigo-500/50" : "border-zinc-700 hover:border-zinc-600 hover:shadow-md",
       data.status === 'failed' && "border-rose-500",
       data.status === 'running' && "border-blue-500 animate-pulse",
       data.status === 'completed' && "border-emerald-500"
@@ -68,7 +68,7 @@ export default function CustomNode({ data, isConnectable, selected }: { data: No
           type="target" 
           position={Position.Left} 
           isConnectable={isConnectable}
-          className="w-3 h-3 bg-zinc-300 border-2 border-white rounded-full -ml-[1.5px]"
+          className="w-3 h-3 bg-zinc-600 border-2 border-zinc-900 rounded-full -ml-[1.5px]"
         />
       )}
 
@@ -81,11 +81,11 @@ export default function CustomNode({ data, isConnectable, selected }: { data: No
         
         {/* Text Container */}
         <div className="flex flex-col flex-1 overflow-hidden">
-          <span className="text-sm font-semibold text-zinc-900 truncate">
+          <span className="text-sm font-semibold text-zinc-100 truncate">
             {data.label || style.defaultLabel}
           </span>
           {data.description && (
-            <span className="text-xs text-zinc-500 truncate">
+            <span className="text-xs text-zinc-400 truncate">
               {data.description}
             </span>
           )}
@@ -97,7 +97,7 @@ export default function CustomNode({ data, isConnectable, selected }: { data: No
         type="source" 
         position={Position.Right} 
         isConnectable={isConnectable}
-        className="w-3 h-3 bg-indigo-500 border-2 border-white rounded-full -mr-[1.5px]"
+        className="w-3 h-3 bg-indigo-500 border-2 border-zinc-900 rounded-full -mr-[1.5px]"
       />
       
       {/* Additional Handle for False Branch in Conditionals */}
@@ -107,7 +107,7 @@ export default function CustomNode({ data, isConnectable, selected }: { data: No
           position={Position.Bottom} 
           id="false"
           isConnectable={isConnectable}
-          className="w-3 h-3 bg-rose-500 border-2 border-white rounded-full -mb-[1.5px]"
+          className="w-3 h-3 bg-rose-500 border-2 border-zinc-900 rounded-full -mb-[1.5px]"
         />
       )}
     </div>
