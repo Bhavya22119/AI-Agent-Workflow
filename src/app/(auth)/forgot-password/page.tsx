@@ -13,7 +13,7 @@ export default function ForgotPasswordPage() {
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
     await resetPassword(email, {
-      redirectTo: '/reset-password' // Redirect URL in the email link
+      redirectTo: `${window.location.origin}/reset-password`
     });
   };
 
