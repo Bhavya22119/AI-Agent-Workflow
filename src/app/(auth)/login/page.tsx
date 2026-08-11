@@ -16,19 +16,19 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const { isSuccess } = await signInEmailPassword(email, password);
-    if (isSuccess) router.push('/workflows');
+    if (isSuccess) window.location.href = '/workflows';
   };
 
   return (
     <Card className="p-8">
-      <h1 className="text-2xl font-bold text-center mb-6 text-white">Welcome Back</h1>
+      <h1 className="text-2xl font-bold text-center mb-6 text-zinc-900">Welcome Back</h1>
       <form onSubmit={handleLogin} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
+          <label className="block text-sm font-medium text-zinc-600 mb-1">Email</label>
           <Input type="email" value={email} onChange={e => setEmail(e.target.value)} required />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1">Password</label>
+          <label className="block text-sm font-medium text-zinc-600 mb-1">Password</label>
           <Input type="password" value={password} onChange={e => setPassword(e.target.value)} required />
         </div>
         {error && <p className="text-rose-500 text-sm">{error.message}</p>}
@@ -36,11 +36,11 @@ export default function LoginPage() {
           {isLoading ? 'Signing in...' : 'Sign In'}
         </Button>
       </form>
-      <p className="mt-4 text-center text-sm text-slate-400">
-        Don't have an account? <Link href="/signup" className="text-indigo-400 hover:text-indigo-300">Sign up</Link>
+      <p className="mt-4 text-center text-sm text-zinc-500">
+        Don't have an account? <Link href="/signup" className="text-blue-600 hover:text-blue-700">Sign up</Link>
       </p>
-      <p className="mt-2 text-center text-sm text-slate-400">
-        <Link href="/forgot-password" className="text-indigo-400 hover:text-indigo-300">Forgot your password?</Link>
+      <p className="mt-2 text-center text-sm text-zinc-500">
+        <Link href="/forgot-password" className="text-blue-600 hover:text-blue-700">Forgot your password?</Link>
       </p>
     </Card>
   );

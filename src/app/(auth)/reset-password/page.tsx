@@ -27,8 +27,8 @@ function ResetPasswordForm() {
         <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 text-xl">
           ✓
         </div>
-        <h1 className="text-2xl font-bold mb-2 text-white">Password Updated!</h1>
-        <p className="text-slate-300 mb-6">Your password has been changed successfully.</p>
+        <h1 className="text-2xl font-bold mb-2 text-zinc-900">Password Updated!</h1>
+        <p className="text-zinc-600 mb-6">Your password has been changed successfully.</p>
         <Link href="/login">
           <Button className="w-full">Go to Log in</Button>
         </Link>
@@ -38,7 +38,7 @@ function ResetPasswordForm() {
 
   return (
     <Card className="p-8">
-      <h1 className="text-2xl font-bold text-center mb-6 text-white">Set New Password</h1>
+      <h1 className="text-2xl font-bold text-center mb-6 text-zinc-900">Set New Password</h1>
       
       {urlError && (
         <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-rose-500 text-sm text-center">
@@ -53,7 +53,7 @@ function ResetPasswordForm() {
 
       <form onSubmit={handleReset} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1">New Password</label>
+          <label className="block text-sm font-medium text-zinc-600 mb-1">New Password</label>
           <Input 
             type="password" 
             value={newPassword} 

@@ -16,19 +16,19 @@ export default function SignupPage() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     const { isSuccess } = await signUpEmailPassword(email, password);
-    if (isSuccess) router.push('/onboarding');
+    if (isSuccess) window.location.href = '/onboarding';
   };
 
   return (
     <Card className="p-8">
-      <h1 className="text-2xl font-bold text-center mb-6 text-white">Create Account</h1>
+      <h1 className="text-2xl font-bold text-center mb-6 text-zinc-900">Create Account</h1>
       <form onSubmit={handleSignup} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
+          <label className="block text-sm font-medium text-zinc-600 mb-1">Email</label>
           <Input type="email" value={email} onChange={e => setEmail(e.target.value)} required />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1">Password</label>
+          <label className="block text-sm font-medium text-zinc-600 mb-1">Password</label>
           <Input type="password" value={password} onChange={e => setPassword(e.target.value)} required />
         </div>
         {error && <p className="text-rose-500 text-sm">{error.message}</p>}
@@ -36,8 +36,8 @@ export default function SignupPage() {
           {isLoading ? 'Creating account...' : 'Sign Up'}
         </Button>
       </form>
-      <p className="mt-4 text-center text-sm text-slate-400">
-        Already have an account? <Link href="/login" className="text-indigo-400 hover:text-indigo-300">Log in</Link>
+      <p className="mt-4 text-center text-sm text-zinc-500">
+        Already have an account? <Link href="/login" className="text-blue-600 hover:text-blue-700">Log in</Link>
       </p>
     </Card>
   );
