@@ -149,7 +149,29 @@ async function executeNotify(config: any, input: any, workflowRunId: string): Pr
     }
   `, { orgId, runId: workflowRunId, key: 'notify_' + (config.channel || 'default'), value: { message: config.message, recipient: config.recipient, input } });
 
-  console.log(`[SIMULATED EMAIL] Sent to ${config.recipient || 'unknown'}: ${config.message || ''}`);
+  const resendApiKey = process.env.RESEND_API_KEY;
+  if (resendApiKey) {
+    try {
+      // Dynamic import to avoid loading it if not needed everywhere
+      const { Resend } = await import('resend');
+      const resend = new Resend(resendApiKey);
+      
+      const emailContent = interpolate(config.message || '', input, []);
+      
+      await resend.emails.send({
+        from: 'onboarding@resend.dev',
+        to: config.recipient,
+        subject: 'AI Agent Workflow Notification',
+        html: `<p>${emailContent.replace(/\n/g, '<br/>')}</p>`,
+      });
+      console.log(`[RESEND EMAIL] Successfully sent to ${config.recipient}`);
+    } catch (err: any) {
+      console.error(`[RESEND EMAIL FAILED] Error:`, err);
+    }
+  } else {
+    console.log(`[SIMULATED EMAIL] (RESEND_API_KEY not found) Sent to ${config.recipient || 'unknown'}: ${config.message || ''}`);
+  }
+
   return { success: true };
 }
 
