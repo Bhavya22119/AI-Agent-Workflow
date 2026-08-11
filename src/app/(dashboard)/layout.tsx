@@ -60,15 +60,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   ];
 
   return (
-    <div className="flex h-screen overflow-hidden bg-zinc-50">
-      <aside className="w-64 border-r border-zinc-200 bg-white flex flex-col shadow-sm">
-        <div className="h-16 flex items-center px-6 border-b border-zinc-200">
+    <div className="flex h-screen overflow-hidden bg-zinc-950">
+      <aside className="w-64 border-r border-zinc-800 bg-zinc-950 flex flex-col shadow-sm shrink-0">
+        <div className="h-16 flex items-center px-6 border-b border-zinc-800 shrink-0">
           <Link href="/dashboard" className="flex items-center gap-2 cursor-pointer group">
-            <span className="font-bold text-zinc-900 text-2xl tracking-tight transition-colors group-hover:text-indigo-600" style={{ fontFamily: 'cursive' }}>AgentFlow</span>
+            <span className="font-bold text-white text-2xl tracking-tight transition-colors group-hover:text-indigo-400" style={{ fontFamily: 'cursive' }}>AgentFlow</span>
           </Link>
         </div>
         
-        <nav className="flex-1 py-4 px-3 space-y-1">
+        <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
           {navigation.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
@@ -77,8 +77,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 href={item.href}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   isActive 
-                  ? 'bg-zinc-100 text-zinc-900 shadow-sm' 
-                  : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900'
+                  ? 'bg-zinc-800 text-white shadow-sm' 
+                  : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
                 }`}
               >
                 {item.name}
@@ -86,19 +86,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             );
           })}
         </nav>
-        <div className="p-4 border-t border-zinc-200">
+        <div className="p-4 border-t border-zinc-800 shrink-0">
           <button 
             onClick={async () => {
               await signOut();
               router.push('/login');
             }} 
-            className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors w-full text-left cursor-pointer py-2 px-3 rounded-md hover:bg-zinc-50"
+            className="text-sm text-zinc-400 hover:text-white transition-colors w-full text-left cursor-pointer py-2 px-3 rounded-md hover:bg-zinc-800/50"
           >
             Log out
           </button>
         </div>
       </aside>
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto bg-zinc-950 text-zinc-300">
         <div className="container mx-auto p-8 max-w-6xl">
           {children}
         </div>
