@@ -29,11 +29,18 @@ export default function Home() {
                 </Button>
               </Link>
             ) : (
-              <Link href="/onboarding">
-                <Button className="rounded-full bg-zinc-900 hover:bg-zinc-800 text-white font-semibold px-6 transition-all">
-                  Login / Signup
-                </Button>
-              </Link>
+              <div className="flex items-center gap-2">
+                <Link href="/login">
+                  <Button variant="ghost" className="rounded-full text-zinc-700 font-medium px-4 transition-all">
+                    Log In
+                  </Button>
+                </Link>
+                <Link href="/signup">
+                  <Button className="rounded-full bg-zinc-900 hover:bg-zinc-800 text-white font-semibold px-6 transition-all">
+                    Sign Up
+                  </Button>
+                </Link>
+              </div>
             )}
           </div>
         </div>

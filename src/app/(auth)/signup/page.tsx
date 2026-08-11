@@ -16,7 +16,7 @@ export default function SignupPage() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     const { isSuccess } = await signUpEmailPassword(email, password);
-    if (isSuccess) router.push('/workflows');
+    if (isSuccess) router.push('/onboarding');
   };
 
   return (

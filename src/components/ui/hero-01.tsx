@@ -235,9 +235,12 @@ function MainContent({ className }: { className?: string }) {
         workflow automation with humans in the loop.
       </p>
 
-      <div className="mb-6 flex flex-col items-center sm:mb-8 sm:flex-row justify-center">
-        <Button className="px-8 bg-zinc-900 hover:bg-zinc-800 text-white border-0 h-11 text-base rounded-full" onClick={() => window.location.href='/onboarding'}>
-          Login / Sign up
+      <div className="mb-6 grid grid-cols-2 items-center gap-4 sm:mb-8 sm:flex justify-center">
+        <Button className="px-4 sm:px-8 bg-zinc-900 hover:bg-zinc-800 text-white border-0 rounded-full h-11" onClick={() => window.location.href='/signup'}>
+          Sign Up
+        </Button>
+        <Button className="px-4 sm:px-8 border border-zinc-200 hover:bg-zinc-100 text-zinc-700 bg-white rounded-full h-11" variant="ghost" onClick={() => window.location.href='/login'}>
+          Log In
         </Button>
       </div>
 
