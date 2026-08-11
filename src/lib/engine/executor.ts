@@ -188,10 +188,11 @@ async function executeNotify(config: any, input: any, workflowRunId: string): Pr
       });
 
       const emailContent = interpolate(config.message || '', input, []);
+      const emailRecipient = interpolate(config.recipient || '', input, []);
       
       await transporter.sendMail({
         from: `"AI Agent Builder" <${smtpEmail}>`,
-        to: config.recipient,
+        to: emailRecipient,
         subject: 'AI Agent Workflow Notification',
         html: `<p>${emailContent.replace(/\n/g, '<br/>')}</p>`,
       });
