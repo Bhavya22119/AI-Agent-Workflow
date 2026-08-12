@@ -1221,7 +1221,7 @@
                 "num_retries": 3,
                 "timeout_sec": 60
               },
-              "webhook": "https://ai-agent-workflow-vpjc.vercel.app/api/hasura/events/notification-created",
+              "webhook": "https://www.agentora.app/api/hasura/events/notification-created",
               "headers": [
                 {
                   "name": "x-hasura-event-secret",
@@ -1786,7 +1786,7 @@
                 "num_retries": 2,
                 "timeout_sec": 60
               },
-              "webhook": "https://ai-agent-workflow-vpjc.vercel.app/api/hasura/events/watched-record-created",
+              "webhook": "https://www.agentora.app/api/hasura/events/watched-record-created",
               "headers": [
                 {
                   "name": "x-hasura-event-secret",
@@ -2974,7 +2974,7 @@
     {
       "name": "approveStep",
       "definition": {
-        "handler": "https://ai-agent-workflow-vpjc.vercel.app/api/hasura/actions/approve-step",
+        "handler": "https://www.agentora.app/api/hasura/actions/approve-step",
         "output_type": "StepDecisionOutput!",
         "ignored_client_headers": [
           "Content-Length",
@@ -3021,7 +3021,7 @@
     {
       "name": "createOrganization",
       "definition": {
-        "handler": "https://ai-agent-workflow-vpjc.vercel.app/api/hasura/actions/create-organization",
+        "handler": "https://www.agentora.app/api/hasura/actions/create-organization",
         "output_type": "CreateOrganizationOutput!",
         "ignored_client_headers": [
           "Content-Length",
@@ -3064,7 +3064,7 @@
     {
       "name": "getWebhookEndpoint",
       "definition": {
-        "handler": "https://ai-agent-workflow-vpjc.vercel.app/api/hasura/actions/get-webhook-endpoint",
+        "handler": "https://www.agentora.app/api/hasura/actions/get-webhook-endpoint",
         "output_type": "WebhookEndpointOutput!",
         "ignored_client_headers": [
           "Content-Length",
@@ -3106,7 +3106,7 @@
     {
       "name": "rejectStep",
       "definition": {
-        "handler": "https://ai-agent-workflow-vpjc.vercel.app/api/hasura/actions/reject-step",
+        "handler": "https://www.agentora.app/api/hasura/actions/reject-step",
         "output_type": "StepDecisionOutput!",
         "ignored_client_headers": [
           "Content-Length",
@@ -3153,7 +3153,7 @@
     {
       "name": "rotateWebhookSecret",
       "definition": {
-        "handler": "https://ai-agent-workflow-vpjc.vercel.app/api/hasura/actions/rotate-webhook-secret",
+        "handler": "https://www.agentora.app/api/hasura/actions/rotate-webhook-secret",
         "output_type": "WebhookSecretOutput!",
         "ignored_client_headers": [
           "Content-Length",
@@ -3196,7 +3196,7 @@
     {
       "name": "triggerWorkflowRun",
       "definition": {
-        "handler": "https://ai-agent-workflow-vpjc.vercel.app/api/hasura/actions/trigger-workflow-run",
+        "handler": "https://www.agentora.app/api/hasura/actions/trigger-workflow-run",
         "output_type": "TriggerRunOutput!",
         "ignored_client_headers": [
           "Content-Length",
@@ -3243,7 +3243,7 @@
     {
       "name": "triggerWorkflowWebhook",
       "definition": {
-        "handler": "https://ai-agent-workflow-vpjc.vercel.app/api/hasura/actions/trigger-workflow-webhook",
+        "handler": "https://www.agentora.app/api/hasura/actions/trigger-workflow-webhook",
         "output_type": "TriggerRunOutput!",
         "ignored_client_headers": [
           "Content-Length",
@@ -3297,7 +3297,7 @@
     {
       "name": "upsertOrgMember",
       "definition": {
-        "handler": "https://ai-agent-workflow-vpjc.vercel.app/api/hasura/actions/upsert-org-member",
+        "handler": "https://www.agentora.app/api/hasura/actions/upsert-org-member",
         "output_type": "OrgMemberOutput!",
         "ignored_client_headers": [
           "Content-Length",
@@ -3482,7 +3482,7 @@
   "cron_triggers": [
     {
       "name": "workflow_scheduler",
-      "webhook": "https://ai-agent-workflow-vpjc.vercel.app/api/hasura/events/cron-tick",
+      "webhook": "https://www.agentora.app/api/hasura/events/cron-tick",
       "schedule": "* * * * *",
       "include_in_metadata": true,
       "payload": {},
