@@ -136,11 +136,13 @@ export async function parseActionRequest<TInput = Record<string, unknown>>(
       console.error(
         '[auth] HASURA_ACTION_SECRET is not set on this deployment, but Hasura sent one.',
       );
+      // 400, not 500: Hasura discards the body of any 5xx and hands the client a
+      // bare "internal error", which is precisely the message this exists to avoid.
       throw new ActionError(
         'MISCONFIGURED',
         'This deployment has no HASURA_ACTION_SECRET set, so it cannot verify that the ' +
           'request came from Hasura. Set it to the same value used when the metadata was applied.',
-        500,
+        400,
       );
     }
     console.error('[auth] action secret mismatch — deployment and Hasura metadata disagree.');
@@ -226,10 +228,14 @@ export async function requireOrgRole(
 export function assertHasuraEvent(req: Request): void {
   const provided = req.headers.get('x-hasura-event-secret') ?? undefined;
   if (!serverEnv.webhookSecret) {
+    // 4xx so Hasura stops retrying: a missing environment variable is not a
+    // transient fault, and burning the retry budget on it only delays the real
+    // events behind it.
     throw new ActionError(
       'MISCONFIGURED',
-      'HASURA_WEBHOOK_SECRET is not set on the server.',
-      500,
+      'HASURA_WEBHOOK_SECRET is not set on this deployment, so it cannot verify that the ' +
+        'event came from Hasura. Set it to the same value used when the metadata was applied.',
+      400,
     );
   }
   if (!secretsMatch(provided, serverEnv.webhookSecret)) {

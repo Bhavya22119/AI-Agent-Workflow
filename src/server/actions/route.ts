@@ -3,8 +3,21 @@
  * speaking Hasura's Action protocol.
  *
  * Success -> 200 with the output object (Hasura maps it onto the output type).
- * Failure -> the ActionError's status plus { message, extensions.code }, which
- * Hasura surfaces to the GraphQL client as a normal error entry.
+ * Failure -> a 4xx plus { message, extensions.code }, which Hasura surfaces to
+ * the GraphQL client as a normal error entry.
+ *
+ * ============================================================================
+ *  Why nothing here ever returns 5xx
+ * ============================================================================
+ *  Hasura's Action contract is "2xx or 4xx". Given anything else it discards the
+ *  response body entirely and hands the client a bare `internal error`:
+ *
+ *      expecting 2xx or 4xx status code, but found 500
+ *
+ *  So a handler that answers 500 — however carefully worded its message — is a
+ *  handler whose message nobody will ever read. The detail goes to the server log
+ *  and the client gets a 4xx carrying the real text, which is the only way an
+ *  operator finds out what broke without shell access to the logs.
  */
 import { ActionError, parseActionRequest, type Caller } from '../auth';
 import { GraphQLRequestError } from '../hasura';
@@ -15,8 +28,14 @@ export type ActionHandler<TInput, TOutput> = (
   caller: Caller,
 ) => Promise<TOutput>;
 
+/**
+ * Clamped to 4xx: see the note at the top of the file. A 5xx would cost us the
+ * message, so a server-side fault is reported as 400 with its code intact rather
+ * than as an unexplained `internal error`.
+ */
 function errorResponse(status: number, code: string, message: string): Response {
-  return Response.json({ message, extensions: { code } }, { status });
+  const forwardable = status >= 200 && status < 500 ? status : 400;
+  return Response.json({ message, extensions: { code } }, { status: forwardable });
 }
 
 export function createActionRoute<TInput, TOutput>(
@@ -45,11 +64,11 @@ export function createActionRoute<TInput, TOutput>(
       }
       if (error instanceof GraphQLRequestError) {
         console.error(`[action:${name}] GraphQL failure:`, error.message);
-        return errorResponse(500, 'DATABASE_ERROR', 'The database rejected this operation.');
+        return errorResponse(400, 'DATABASE_ERROR', 'The database rejected this operation.');
       }
       const message = error instanceof Error ? error.message : String(error);
       console.error(`[action:${name}] unexpected failure:`, message);
-      return errorResponse(500, 'INTERNAL_ERROR', 'Something went wrong handling this action.');
+      return errorResponse(400, 'INTERNAL_ERROR', `Something went wrong handling this action: ${message}`);
     }
   };
 }
