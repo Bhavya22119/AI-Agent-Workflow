@@ -190,12 +190,18 @@ async function callViaHasura<T>(
 }
 
 /**
- * Hasura's wording for "I could not open a connection to the handler". It is a
- * transport failure, not a rejection, so it is the one error worth retrying a
- * different way.
+ * Hasura's wordings for "I never got a usable answer from the handler". These are
+ * transport failures rather than rejections, so they are the errors worth retrying
+ * a different way.
+ *
+ * `not a valid json response from webhook` belongs here even though it sounds like
+ * a bug in the handler: it means Hasura reached *something* and got HTML back —
+ * a parked domain, a redirect body, a platform 404, a deploy mid-flight. In other
+ * words it reached the wrong thing, which is the same class of problem as reaching
+ * nothing, and shows up whenever the configured URL is not (yet) the app.
  */
 function isUnreachable(message: string): boolean {
-  return /http exception|could not connect|connection error|ConnectionError|ECONNREFUSED|timeout|unexpected/i.test(
+  return /http exception|could not connect|connection error|ConnectionError|ECONNREFUSED|timeout|unexpected|not a valid json response/i.test(
     message,
   );
 }
