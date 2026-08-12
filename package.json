@@ -1,27 +1,30 @@
 {
   "name": "ai-agent-workflow-builder",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
+  "description": "Multi-tenant AI agent workflow builder on Nhost + Hasura + PostgreSQL",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "db:apply": "node scripts/db-apply.mjs",
+    "db:reset": "node scripts/db-apply.mjs --reset",
+    "hasura:apply": "node scripts/hasura-apply.mjs",
+    "seed": "node scripts/seed.mjs",
+    "setup": "node scripts/setup.mjs",
+    "verify": "node scripts/verify.mjs",
+    "test:nodes": "node scripts/test-nodes.mjs"
   },
   "dependencies": {
-    "@nhost/nextjs": "latest",
-    "@nhost/nhost-js": "latest",
-    "@nhost/react": "latest",
-    "@radix-ui/react-slot": "^1.3.3",
-    "@vercel/functions": "^3.9.2",
+    "@nhost/nhost-js": "4.8.0",
     "@xyflow/react": "^12.11.2",
-    "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cron-parser": "^5.8.1",
-    "framer-motion": "^13.1.0",
-    "graphql-request": "^7.1.0",
+    "graphql": "^16.8.1",
     "graphql-ws": "^5.16.2",
-    "lucide-react": "^0.395.0",
+    "lucide-react": "^1.31.0",
     "next": "16.3.0",
     "nodemailer": "^9.0.5",
     "react": "19.2.8",
@@ -29,14 +32,18 @@
     "tailwind-merge": "^2.3.0"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^20.19.9",
     "@types/nodemailer": "^8.0.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3",
+    "yaml": "^2.8.1"
+  },
+  "engines": {
+    "node": ">=20.9.0"
   }
 }

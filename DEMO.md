@@ -1,168 +1,168 @@
-# Demo Walkthrough — Final Task Scenario
+# Demo script
 
-This document walks through the exact 6-point Final Task scenario that proves the system works end-to-end.
+A ~6 minute walkthrough covering the six things the final task asks to be shown live.
+Everything below is already seeded, so nothing has to be built during the recording.
 
-## Prerequisites
-
-1. Nhost backend running (`nhost dev` or deployed to Nhost Cloud)
-2. Frontend running (`npm run dev` or deployed to Vercel)
-3. Seed data applied (two orgs, demo workflow)
-4. At least 3 users created via signup:
-   - **User A1** — owner of Org A
-   - **User A2** — editor of Org A
-   - **User B1** — owner of Org B
-
-## Scenario Steps
-
-### 1. Two Organizations Exist
-
-After running the seed SQL:
-- **Org A Demo** (ID: `11111111-1111-1111-1111-111111111111`) — quota: 100
-- **Org B Demo** (ID: `22222222-2222-2222-2222-222222222222`) — quota: 50
-
-After user signup, add members via Hasura Console or direct SQL:
-```sql
--- Replace UUIDs with actual auth.users IDs from signup
-INSERT INTO org_members (org_id, user_id, role) VALUES
-('11111111-1111-1111-1111-111111111111', '<user-a1-id>', 'owner'),
-('11111111-1111-1111-1111-111111111111', '<user-a2-id>', 'editor'),
-('22222222-2222-2222-2222-222222222222', '<user-b1-id>', 'owner');
-```
-
-### 2. Build a Workflow in Org A (as Owner)
-
-Log in as **User A1**, select **Org A Demo**.
-
-The seed data already includes a 5-step workflow:
-1. **llm_call** — "Analyze the sentiment of: {{input}}"
-2. **http_request** — POST to httpbin.org with sentiment result
-3. **conditional_branch** — if result contains "positive" → step 4, else → step 5
-4. **approval_gate** — "Please review the positive sentiment result"
-5. **db_write** — save sentiment_result to workflow_outputs
-
-Triggers: Manual ✅ and Webhook ✅ (secret: `demo-webhook-secret-123`)
-
-### 3. Start the Workflow Manually
-
-1. Navigate to the demo workflow
-2. Click **Run Workflow** button
-3. The system creates a `workflow_run` and begins execution
-
-### 4. Live Status Streams Step-by-Step
-
-The Run Viewer page shows a GraphQL subscription on `step_runs`:
-
-1. **Step 1 (llm_call)** — 🔵 Running → ✅ Completed
-   - Output shows: LLM response (or stub: "[STUB] positive - The text has a generally positive sentiment...")
-2. **Step 2 (http_request)** — 🔵 Running → ✅ Completed
-   - Output shows: httpbin.org response with the sentiment data
-3. **Step 3 (conditional_branch)** — 🔵 Running → ✅ Completed
-   - Output shows: `{ "conditionMet": true }` (because stub output contains "positive")
-4. **Step 4 (approval_gate)** — 🔵 Running → ⏸️ **Paused**
-   - Banner: "⚠️ Paused — Awaiting Approval"
-   - Approve button visible for owner/editor
-
-**No page refresh needed** — updates stream via WebSocket subscription.
-
-### 5. Approve the Paused Step
-
-1. As **User A1** (owner) or **User A2** (editor), click **Approve**
-2. The system:
-   - Verifies the approver is owner/editor in the workflow's org (server-side)
-   - Sets `approved_by` and `approved_at`
-   - Marks step as completed
-   - Resumes execution from step 5
-3. **Step 5 (db_write)** — 🔵 Running → ✅ Completed
-   - Output shows: `{ "success": true }`
-4. Overall workflow run status: ✅ **Completed**
-
-### 6. Start via Webhook Trigger
-
-Use curl to invoke the webhook:
+## Before you start
 
 ```bash
-curl -X POST http://localhost:1337/v1/graphql \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "mutation { invokeWorkflowWebhook(workflow_id: \"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\", secret: \"demo-webhook-secret-123\", payload: {\"text\": \"This is wonderful news!\"}) { workflow_run_id status } }"
-  }'
+npm run dev        # terminal 1
 ```
 
-Response:
-```json
-{
-  "data": {
-    "invokeWorkflowWebhook": {
-      "workflow_run_id": "<new-uuid>",
-      "status": "pending"
-    }
-  }
-}
-```
+Open two browser windows side by side, so the cross-tenant part needs no logging out:
 
-The workflow starts executing, and the live subscription in the frontend updates.
+| Window | Account | Role |
+| --- | --- | --- |
+| left | `owner-a@agentflow.test` | owner, Org A — *Northwind Support* |
+| right | `owner-b@agentflow.test` | owner, Org B — *Contoso Logistics* |
 
-### 7. Cross-Org Isolation Proof (as Org B User)
+Password for every account: `Password123!`. A third tab signed in as
+`editor-a@agentflow.test` is handy for the approval step, and `viewer-a@agentflow.test`
+if you want to show the read-only case.
 
-Log in as **User B1** (Org B owner).
-
-**Attempt 1 — View Org A's workflows:**
-- Navigate to dashboard → Only Org B workflows visible (none seeded)
-- Org A's workflow does NOT appear in the list
-
-**Attempt 2 — Direct ID query:**
-```graphql
-query {
-  workflows_by_pk(id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa") {
-    id
-    name
-  }
-}
-```
-Result: `null` (Hasura permission filter returns empty because User B1 has no membership in Org A)
-
-**Attempt 3 — Trigger Org A's workflow:**
-```graphql
-mutation {
-  triggerWorkflowRun(workflow_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa") {
-    workflow_run_id
-    status
-  }
-}
-```
-Result: Error — "Insufficient permissions" (Action handler verifies org membership server-side)
-
-**Attempt 4 — Approve Org A's paused step:**
-```graphql
-mutation {
-  approveStep(step_run_id: "<org-a-paused-step-run-id>") {
-    workflow_run_id
-    status
-  }
-}
-```
-Result: Error — "Insufficient permissions" (Action handler verifies org membership server-side)
-
-## What This Proves
-
-All six points of the Final Task are satisfied:
-1. ✅ Two separate organizations with their own users and roles
-2. ✅ Owner builds a workflow with llm_call, http_request, conditional_branch, approval_gate, db_write
-3. ✅ Workflow starts manually AND via webhook trigger
-4. ✅ approval_gate pauses the run, only owner/editor can approve
-5. ✅ Live status streams step-by-step with no refresh
-6. ✅ Org B user cannot see, trigger, or approve Org A data — not even by guessing IDs
-
-## Webhook Test Script
+Have this ready to paste in a terminal (`npm run seed` prints it filled in):
 
 ```bash
-# Test webhook trigger
-curl -X POST http://localhost:1337/v1/graphql \
-  -H "Content-Type: application/json" \
-  -d '{"query":"mutation { invokeWorkflowWebhook(workflow_id: \"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\", secret: \"demo-webhook-secret-123\", payload: {\"text\": \"I love this product!\"}) { workflow_run_id status } }"}'
-
-# Test with wrong secret (should fail)
-curl -X POST http://localhost:1337/v1/graphql \
-  -H "Content-Type: application/json" \
-  -d '{"query":"mutation { invokeWorkflowWebhook(workflow_id: \"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\", secret: \"wrong-secret\", payload: {}) { workflow_run_id status } }"}'
+curl -X POST "http://localhost:3000/api/webhooks/<TRIGGER_ID>" \
+  -H 'x-webhook-secret: <SECRET>' \
+  -H 'content-type: application/json' \
+  -d '{"text":"Your courier lost my parcel and nobody will help me","customer":"acme"}'
 ```
+
+---
+
+## 1. Two organizations, their own users and roles  *(~40s)*
+
+Left window, **Members**: three people in Org A with owner / editor / viewer, and a
+note of what each role may do. Right window: Org B has one member. The org switcher in
+each window lists only that user's own organizations.
+
+> Say: *roles are per-organization, not per-user — that is why they live in
+> `org_members` and are resolved by every Hasura permission, rather than being Hasura
+> roles from the JWT.*
+
+## 2. The workflow  *(~50s)*
+
+Left window → **Support ticket triage**. Six steps, and the assignment's required three
+types are all here: `llm_call`, `http_request`, `conditional_branch`, plus the
+`approval_gate`.
+
+Open step 3 and show the condition: it tests `{{steps.1.output.text}}` — the LLM's
+answer, not the HTTP response — for `negative`, and routes **true → step 4** (the
+approval gate) and **false → step 6** (straight to the database write). So the LLM's
+output genuinely changes what happens next.
+
+Show the arrow buttons reordering a step, and the **Add step** menu: `db_write` and
+`notify` are visibly locked with *owner only*.
+
+## 3. Run it manually, live  *(~70s)*
+
+Press **Run**. The run page shows the same graph with live status on each node, and a
+timeline underneath. Without touching anything:
+
+- step 1 `llm_call` → **Running** → **Done**, output shows the classification and which
+  provider answered
+- step 2 `http_request` → **Done**, HTTP 200
+- step 3 condition → **Done**, `true → step 4`
+- step 4 `approval_gate` → **Awaiting approval**, and the run badge switches to
+  *Awaiting approval*
+- the `db_write` node stays untouched, because that path has not been reached yet
+
+> Say: *this is one GraphQL subscription on `step_runs` filtered by
+> `workflow_run_id`. Nothing is polled, and the paused state is a row in Postgres, not
+> a held connection.*
+
+Expand step 1 to show input and output; the input is the fully rendered prompt.
+
+## 4. Approve it, as somebody else  *(~50s)*
+
+Switch to the `editor-a` tab, open the same run (Runs → the paused one). The **Approve
+and continue** panel is on the paused step. Add a note, press it.
+
+Both tabs update, on the canvas and in the timeline: `notify` → Done, `db_write` →
+Done, run → **Completed**.
+Expand step 4: it records who approved and when. Scroll down: the **Database writes**
+card shows the row `db_write` inserted, with values pulled from three different earlier
+steps — including `escalated: true`, which only existed after the pause.
+
+If you want the negative case: as `viewer-a` the Approve buttons are simply absent,
+the Run button is replaced by *view only*, and the canvas is read-only.
+
+A good extra beat: run it again with a *positive* message and watch the condition take
+the **false** connection, leaving the gate and notify nodes greyed out as **skipped**
+while the run still completes.
+
+## 5. Start a run with no button click  *(~40s)*
+
+Paste the `curl` above. It returns `202` with a run id. On the dashboard, **Live
+activity** grows a new row by itself, tagged `webhook`, with no refresh.
+
+> Say: *that is the `triggerWorkflowWebhook` Hasura Action, exposed to the
+> unauthorized `public` role. There is no user session, so the credential is a
+> per-trigger secret that is not readable through the GraphQL API at all.*
+
+Optionally also: open the workflow's **Database event** trigger and press *Insert a test
+row* — a Hasura Event Trigger on `watched_records` starts another run.
+
+## 6. Prove Org B cannot touch Org A  *(~80s)*
+
+Right window, as `owner-b`. Copy Org A's ids from the left window's **Settings** page so
+you are guessing them deliberately.
+
+1. The dashboard lists only *Delivery note review*. Org A's workflow is absent.
+2. Paste Org A's workflow URL — `/workflows/<org-a-workflow-id>` → **Workflow not
+   found**. Hasura returned no row.
+3. Paste Org A's paused run URL — nothing. The step subscription streams nothing either.
+4. Open the browser console and try it as raw GraphQL, so nobody can claim the UI is
+   doing the filtering:
+
+   ```js
+   await fetch('https://<subdomain>.hasura.<region>.nhost.run/v1/graphql', {
+     method: 'POST',
+     headers: {
+       'content-type': 'application/json',
+       authorization: 'Bearer ' + JSON.parse(localStorage.getItem('nhostSession')).accessToken,
+     },
+     body: JSON.stringify({
+       query: `{ workflows_by_pk(id: "<ORG_A_WORKFLOW_ID>") { id name }
+                 organizations_by_pk(id: "<ORG_A_ORG_ID>") { name quota_limit } }`,
+     }),
+   }).then((r) => r.json());
+   ```
+
+   Both come back `null`.
+
+> Close with: *and the same is true of the Actions — `triggerWorkflowRun` and
+> `approveStep` with Org A ids return 403, because each handler re-checks the caller's
+> role in that row's organization. `npm run verify` asserts all of this, plus retry,
+> quota and the trigger types, as 75 checks.*
+
+---
+
+## Optional closer: the verification suite  *(~30s)*
+
+```bash
+npm run verify
+```
+
+Scroll the output: cross-org isolation, both permission layers, engine tables being
+unwritable, the full run with pause and resume, retry `attempt_count`, quota refusal,
+and each trigger type. 75 passed, 0 failed — and one honest **SKIP** for the
+Hasura-calls-the-handler-over-the-internet check, which only becomes possible once the
+app is deployed.
+
+---
+
+## Things worth mentioning if asked
+
+- **Why one Hasura role?** A Hasura role comes from the JWT and is global to the user;
+  an org role belongs to a `(user, org)` pair. Modelling org roles as Hasura roles
+  cannot express "owner in A, viewer in B".
+- **Why can't approval be a permission?** It is a decision about a run in flight.
+  `workflow_runs` and `step_runs` therefore grant no write permission to anybody, so
+  the Action is the only path — which also stops a viewer from creating a run row to
+  dodge the quota.
+- **What stops an editor sneaking a `db_write` in?** The Layer-2 predicate is on
+  `update` as well as `insert`, and `workflow_triggers.type` is not updatable at all.
+- **Retry:** `attempt_count` is written before each attempt, so a retry is visible in
+  the UI as it happens rather than inferred afterwards.

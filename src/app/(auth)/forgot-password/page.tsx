@@ -1,69 +1,89 @@
-"use client";
+'use client';
+
 import { useState } from 'react';
-import { useResetPassword } from '@nhost/react';
 import Link from 'next/link';
-import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { useAuth } from '@/components/providers/auth-provider';
+import { EmailSent } from '@/components/auth/email-sent';
 import { Button } from '@/components/ui/button';
+import { Field, Input } from '@/components/ui/field';
+import { Alert } from '@/components/ui/feedback';
+import { Card } from '@/components/ui/surface';
 
 export default function ForgotPasswordPage() {
+  const { requestPasswordReset } = useAuth();
   const [email, setEmail] = useState('');
-  const { resetPassword, isLoading, error, isSent } = useResetPassword();
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleReset = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await resetPassword(email, {
-      redirectTo: `${window.location.origin}/reset-password`
-    });
-  };
+  async function onSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      await requestPasswordReset(email);
+      setSent(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not send the reset email.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
-  return (
-    <Card className="p-8">
-      <h1 className="text-2xl font-bold text-center mb-6 text-zinc-900">Reset Password</h1>
-      
-      {isSent ? (
-        <div className="text-center space-y-4">
-          <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto text-xl">
-            ✓
-          </div>
-          <h2 className="text-lg font-medium text-zinc-900">Check your email</h2>
-          <p className="text-sm text-zinc-600">
-            We've sent password reset instructions to <strong>{email}</strong>.
-          </p>
-          <div className="pt-4">
-            <Link href="/login">
-              <Button variant="secondary" className="w-full text-zinc-700">
-                Back to Log in
+  if (sent) {
+    return (
+      <Card className="p-5">
+        <EmailSent
+          email={email}
+          title="Reset link sent"
+          description="Open the link in the email and you will land back here to choose a new password."
+          onResend={() => requestPasswordReset(email)}
+          footer={
+            <Link href="/login" className="block">
+              <Button variant="ghost" className="w-full">
+                Back to sign in
               </Button>
             </Link>
-          </div>
-        </div>
-      ) : (
-        <form onSubmit={handleReset} className="space-y-4">
-          <p className="text-sm text-zinc-600 mb-4">
-            Enter the email address associated with your account and we'll send you a link to reset your password.
-          </p>
-          <div>
-            <label className="block text-sm font-medium text-zinc-600 mb-1">Email address</label>
-            <Input 
-              type="email" 
-              value={email} 
-              onChange={e => setEmail(e.target.value)} 
-              placeholder="name@example.com"
-              required 
-            />
-          </div>
-          {error && <p className="text-rose-500 text-sm">{error.message}</p>}
-          <Button type="submit" className="w-full" disabled={isLoading || !email}>
-            {isLoading ? 'Sending...' : 'Send reset link'}
-          </Button>
-          <div className="mt-4 text-center text-sm">
-            <Link href="/login" className="text-blue-600 hover:text-blue-700 transition-colors">
-              &larr; Back to Log in
-            </Link>
-          </div>
-        </form>
-      )}
+          }
+        />
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="p-5">
+      <h1 className="text-base font-semibold text-ink">Reset your password</h1>
+      <p className="mt-1 text-sm text-ink-3">
+        We will email you a link that signs you in so you can set a new one.
+      </p>
+
+      <form onSubmit={onSubmit} className="mt-5 space-y-4">
+        <Field label="Email" htmlFor="email">
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            required
+            autoFocus
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="you@example.com"
+          />
+        </Field>
+
+        {error ? <Alert tone="danger">{error}</Alert> : null}
+
+        <Button type="submit" variant="primary" size="lg" loading={submitting} className="w-full">
+          Send reset link
+        </Button>
+      </form>
+
+      <p className="mt-4 text-center text-sm text-ink-3">
+        Remembered it?{' '}
+        <Link href="/login" className="font-medium text-accent hover:underline">
+          Sign in
+        </Link>
+      </p>
     </Card>
   );
 }

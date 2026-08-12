@@ -1,0 +1,45 @@
+# =============================================================================
+#  Narrow additions to the Nhost-managed `auth.users` table.
+#
+#  Out of the box Nhost tracks auth.users with no select permission at all, so
+#  the members screen would have nothing but raw UUIDs to show. Rather than
+#  routing member lists through an admin-secret endpoint (which would bypass the
+#  permission system entirely), this grants exactly one thing:
+#
+#      "you may read the profile of a user who shares an organization with you"
+#
+#  Only four columns are exposed, and the predicate walks
+#  users -> org_members -> organizations -> org_members -> X-Hasura-User-Id,
+#  so an Org B user cannot read the profile of an Org A user.
+#
+#  The apply script MERGES this into the existing auth.users metadata: Nhost's
+#  own relationships (roles, refreshTokens, userProviders, ...) are preserved.
+# =============================================================================
+
+- table:
+    schema: auth
+    name: users
+  array_relationships:
+    - name: org_memberships
+      using:
+        foreign_key_constraint_on:
+          table: { schema: public, name: org_members }
+          column: user_id
+  select_permissions:
+    - role: user
+      comment: Profile of users who share at least one organization with the caller.
+      permission:
+        columns:
+          - id
+          - display_name
+          - email
+          - avatar_url
+        filter:
+          _or:
+            - id:
+                _eq: X-Hasura-User-Id
+            - org_memberships:
+                organization:
+                  org_members:
+                    user_id:
+                      _eq: X-Hasura-User-Id

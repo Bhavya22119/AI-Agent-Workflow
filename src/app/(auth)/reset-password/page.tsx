@@ -1,83 +1,174 @@
-"use client";
-import { useState, Suspense } from 'react';
-import { useChangePassword } from '@nhost/react';
-import { useRouter, useSearchParams } from 'next/navigation';
+'use client';
+
+/**
+ * Where the emailed reset link lands.
+ *
+ * Nhost verifies the ticket on its side and redirects here with a refreshToken
+ * in the query string; trading that for a session is what authorises the
+ * password change. The token is removed from the URL immediately so it is not
+ * left sitting in history or in a copied link.
+ */
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useAuth } from '@/components/providers/auth-provider';
 import { Button } from '@/components/ui/button';
+import { Field, Input } from '@/components/ui/field';
+import { Alert, PageLoader } from '@/components/ui/feedback';
+import { Card } from '@/components/ui/surface';
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <ResetPasswordForm />
+    </Suspense>
+  );
+}
 
 function ResetPasswordForm() {
-  const [newPassword, setNewPassword] = useState('');
-  const { changePassword, isLoading, error, isSuccess } = useChangePassword();
-  const router = useRouter();
+  const { user, ready, adoptRefreshToken, changePassword } = useAuth();
   const searchParams = useSearchParams();
-  
-  const urlError = searchParams.get('error');
-  const urlErrorDescription = searchParams.get('errorDescription');
+  const router = useRouter();
 
-  const handleReset = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await changePassword(newPassword);
-  };
+  const [linkState, setLinkState] = useState<'checking' | 'ready' | 'invalid'>('checking');
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
 
-  if (isSuccess) {
+  const refreshToken = searchParams.get('refreshToken');
+  const linkErrorParam = searchParams.get('error');
+
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+
+    async function establish() {
+      if (linkErrorParam) {
+        if (!cancelled) {
+          setLinkState('invalid');
+          setLinkError(searchParams.get('errorDescription') ?? linkErrorParam);
+        }
+        return;
+      }
+      if (refreshToken) {
+        try {
+          await adoptRefreshToken(refreshToken);
+          if (cancelled) return;
+          // Do not leave the token in the address bar.
+          window.history.replaceState(null, '', '/reset-password');
+          setLinkState('ready');
+        } catch (err) {
+          if (cancelled) return;
+          setLinkState('invalid');
+          setLinkError(err instanceof Error ? err.message : 'That link is no longer valid.');
+        }
+        return;
+      }
+      // No token in the URL: only an already-signed-in user can change a password.
+      if (!cancelled) setLinkState(user ? 'ready' : 'invalid');
+    }
+
+    void establish();
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, refreshToken, linkErrorParam, searchParams, adoptRefreshToken, user]);
+
+  async function onSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (password !== confirm) {
+      setError('The two passwords do not match.');
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      await changePassword(password);
+      setDone(true);
+      setTimeout(() => router.replace('/dashboard'), 1600);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not change the password.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (!ready || linkState === 'checking') return <PageLoader label="Checking your link…" />;
+
+  if (linkState === 'invalid') {
     return (
-      <Card className="p-8 text-center">
-        <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 text-xl">
-          ✓
-        </div>
-        <h1 className="text-2xl font-bold mb-2 text-zinc-900">Password Updated!</h1>
-        <p className="text-zinc-600 mb-6">Your password has been changed successfully.</p>
-        <Link href="/login">
-          <Button className="w-full">Go to Log in</Button>
+      <Card className="p-5">
+        <h1 className="text-base font-semibold text-ink">This link cannot be used</h1>
+        <Alert tone="danger" className="mt-4">
+          {linkError ??
+            'Open this page from the reset link in your email — reset links can only be used once, and they expire.'}
+        </Alert>
+        <Link href="/forgot-password" className="mt-4 block">
+          <Button variant="primary" className="w-full">
+            Send a new link
+          </Button>
+        </Link>
+        <Link href="/login" className="mt-2 block">
+          <Button variant="ghost" className="w-full">
+            Back to sign in
+          </Button>
         </Link>
       </Card>
     );
   }
 
-  return (
-    <Card className="p-8">
-      <h1 className="text-2xl font-bold text-center mb-6 text-zinc-900">Set New Password</h1>
-      
-      {urlError && (
-        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-rose-500 text-sm text-center">
-          {urlErrorDescription || 'Invalid or expired password reset link.'}
-          <div className="mt-2">
-            <Link href="/forgot-password" className="underline font-medium hover:text-rose-400">
-              Request a new link
-            </Link>
-          </div>
-        </div>
-      )}
+  if (done) {
+    return (
+      <Card className="p-5">
+        <h1 className="text-base font-semibold text-ink">Password updated</h1>
+        <Alert tone="success" className="mt-4">
+          You are signed in. Taking you to your workspace…
+        </Alert>
+      </Card>
+    );
+  }
 
-      <form onSubmit={handleReset} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-zinc-600 mb-1">New Password</label>
-          <Input 
-            type="password" 
-            value={newPassword} 
-            onChange={e => setNewPassword(e.target.value)} 
-            required 
+  return (
+    <Card className="p-5">
+      <h1 className="text-base font-semibold text-ink">Choose a new password</h1>
+      <p className="mt-1 text-sm text-ink-3">
+        {user?.email ? `For ${user.email}.` : 'Set the password you will use from now on.'}
+      </p>
+
+      <form onSubmit={onSubmit} className="mt-5 space-y-4">
+        <Field label="New password" htmlFor="password" help="At least 8 characters.">
+          <Input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            required
             minLength={8}
-            disabled={!!urlError}
+            autoFocus
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
           />
-        </div>
-        
-        {error && <p className="text-rose-500 text-sm">{error.message}</p>}
-        
-        <Button type="submit" className="w-full" disabled={isLoading || !newPassword || !!urlError}>
-          {isLoading ? 'Updating...' : 'Update Password'}
+        </Field>
+        <Field label="Confirm password" htmlFor="confirm">
+          <Input
+            id="confirm"
+            type="password"
+            autoComplete="new-password"
+            required
+            minLength={8}
+            value={confirm}
+            onChange={(event) => setConfirm(event.target.value)}
+          />
+        </Field>
+
+        {error ? <Alert tone="danger">{error}</Alert> : null}
+
+        <Button type="submit" variant="primary" size="lg" loading={submitting} className="w-full">
+          Update password
         </Button>
       </form>
     </Card>
-  );
-}
-
-export default function ResetPasswordPage() {
-  return (
-    <Suspense fallback={<Card className="p-8 text-center text-white">Loading...</Card>}>
-      <ResetPasswordForm />
-    </Suspense>
   );
 }

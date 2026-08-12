@@ -1,15 +1,53 @@
+# GENERATED FILE — do not edit.
+# Produced from nhost/metadata/actions.yaml by scripts/hasura-apply.mjs.
+
+type Query {
+  getWebhookEndpoint(trigger_id: uuid!): WebhookEndpointOutput!
+}
+
 type Mutation {
-  triggerWorkflowRun(workflow_id: uuid!): TriggerWorkflowRunOutput
-  approveStep(step_run_id: uuid!): ApproveStepOutput
-  invokeWorkflowWebhook(workflow_id: uuid!, secret: String!, payload: jsonb): TriggerWorkflowRunOutput
+  triggerWorkflowRun(workflow_id: uuid!, payload: jsonb): TriggerRunOutput!
+  approveStep(step_run_id: uuid!, note: String): StepDecisionOutput!
+  rejectStep(step_run_id: uuid!, note: String): StepDecisionOutput!
+  triggerWorkflowWebhook(trigger_id: uuid!, secret: String!, payload: jsonb): TriggerRunOutput!
+  createOrganization(name: String!): CreateOrganizationOutput!
+  upsertOrgMember(org_id: uuid!, email: String!, role: String!): OrgMemberOutput!
 }
 
-type TriggerWorkflowRunOutput {
+"""Result of starting a workflow run."""
+type TriggerRunOutput {
   workflow_run_id: uuid!
+  workflow_id: uuid!
   status: String!
+  step_count: Int!
 }
 
-type ApproveStepOutput {
+"""Result of approving or rejecting a paused approval_gate step."""
+type StepDecisionOutput {
+  step_run_id: uuid!
   workflow_run_id: uuid!
-  status: String!
+  decision: String!
+  run_status: String!
+}
+
+type CreateOrganizationOutput {
+  org_id: uuid!
+  name: String!
+  slug: String!
+  role: String!
+}
+
+type OrgMemberOutput {
+  org_member_id: uuid!
+  user_id: uuid!
+  email: String!
+  role: String!
+}
+
+type WebhookEndpointOutput {
+  trigger_id: uuid!
+  graphql_endpoint: String!
+  rest_endpoint: String!
+  secret: String!
+  sample_curl: String!
 }

@@ -1,27 +1,52 @@
-import React from 'react';
+'use client';
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
-  size?: 'sm' | 'md' | 'lg';
+import { forwardRef, type ButtonHTMLAttributes } from 'react';
+import { Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
+type Size = 'sm' | 'md' | 'lg';
+
+const VARIANTS: Record<Variant, string> = {
+  primary:
+    'bg-accent text-white hover:bg-accent-hover disabled:bg-accent/50 shadow-sm shadow-accent/20',
+  secondary: 'bg-surface text-ink border border-line-strong hover:bg-surface-2',
+  ghost: 'text-ink-2 hover:bg-surface-2 hover:text-ink',
+  danger: 'bg-danger text-white hover:brightness-95',
+  success: 'bg-ok text-white hover:brightness-95',
+};
+
+const SIZES: Record<Size, string> = {
+  sm: 'h-8 px-2.5 text-xs gap-1.5 rounded-md',
+  md: 'h-9.5 px-3.5 text-sm gap-2 rounded-lg',
+  lg: 'h-11 px-5 text-sm gap-2 rounded-lg',
+};
+
+export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: Variant;
+  size?: Size;
+  loading?: boolean;
 }
 
-export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className = '', variant = 'primary', size = 'md', ...props }, ref) => {
-    const base = 'inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:opacity-50 disabled:pointer-events-none';
-    const variants = {
-      primary: 'bg-zinc-900 text-white hover:bg-zinc-800',
-      secondary: 'bg-white text-zinc-900 border border-zinc-200 hover:bg-zinc-50 shadow-sm',
-      danger: 'bg-rose-600 text-white hover:bg-rose-700',
-      ghost: 'bg-transparent text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100',
-    };
-    const sizes = {
-      sm: 'h-8 px-3 text-xs',
-      md: 'h-10 px-4 py-2 text-sm',
-      lg: 'h-12 px-6 py-3 text-base',
-    };
-    return (
-      <button ref={ref} className={`${base} ${variants[variant]} ${sizes[size]} ${className}`} {...props} />
-    );
-  }
-);
-Button.displayName = 'Button';
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { variant = 'secondary', size = 'md', loading, className, children, disabled, ...props },
+  ref,
+) {
+  return (
+    <button
+      ref={ref}
+      disabled={disabled || loading}
+      className={cn(
+        'inline-flex items-center justify-center font-medium whitespace-nowrap transition-colors',
+        'disabled:cursor-not-allowed disabled:opacity-60',
+        VARIANTS[variant],
+        SIZES[size],
+        className,
+      )}
+      {...props}
+    >
+      {loading ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+      {children}
+    </button>
+  );
+});

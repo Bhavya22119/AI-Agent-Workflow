@@ -1,0 +1,29 @@
+# =============================================================================
+#  Hasura Cron Trigger — the `scheduled` trigger type.
+#
+#  Hasura's own scheduler (not Vercel Cron) drives this, for two reasons:
+#    * it is part of the Hasura metadata, so it ships with the rest of the
+#      configuration and is visible in the deliverable;
+#    * Vercel's Hobby plan caps cron frequency at once per day, which is useless
+#      for demonstrating a schedule firing.
+#
+#  The tick handler evaluates every enabled `scheduled` trigger's cron
+#  expression against its last_fired_at and starts the ones that are due, so the
+#  per-workflow schedule lives in the database rather than in metadata.
+# =============================================================================
+
+cron_triggers:
+  - name: workflow_scheduler
+    webhook: '{{APP_BASE_URL}}/api/hasura/events/cron-tick'
+    schedule: '* * * * *'
+    include_in_metadata: true
+    payload: {}
+    retry_conf:
+      num_retries: 1
+      retry_interval_seconds: 10
+      timeout_seconds: 60
+      tolerance_seconds: 21600
+    headers:
+      - name: x-hasura-event-secret
+        value: '{{HASURA_WEBHOOK_SECRET}}'
+    comment: Evaluates all enabled scheduled workflow triggers once a minute.

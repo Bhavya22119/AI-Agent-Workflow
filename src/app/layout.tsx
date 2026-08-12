@@ -1,22 +1,28 @@
-import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import type { Metadata, Viewport } from 'next';
+import { AuthProvider } from '@/components/providers/auth-provider';
+import { OrgProvider } from '@/components/providers/org-provider';
 import './globals.css';
-import { NhostProvider } from '@/components/providers/nhost-provider';
-
-const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'AI Agent Workflow Builder',
-  description: 'Build and manage AI workflows',
+  title: 'Agent Flow — AI workflow builder',
+  description:
+    'Multi-tenant AI agent workflow builder on Nhost, Hasura and PostgreSQL: chained LLM steps, human approval gates and live run tracking.',
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#fafafa' },
+    { media: '(prefers-color-scheme: dark)', color: '#1a1a1f' },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${inter.className} bg-zinc-50 text-zinc-900 antialiased`}>
-        <NhostProvider>
-          {children}
-        </NhostProvider>
+      <body>
+        <AuthProvider>
+          <OrgProvider>{children}</OrgProvider>
+        </AuthProvider>
       </body>
     </html>
   );

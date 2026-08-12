@@ -1,0 +1,30 @@
+# =============================================================================
+#  Tracked Postgres functions.
+#
+#  Both are exposed as GraphQL mutations with NO role permissions, which makes
+#  them reachable only with the admin secret — i.e. only from the Action
+#  handlers. Tracking them (rather than sending raw SQL) means every call is a
+#  parameterised GraphQL variable, so no user-supplied UUID or JSON payload is
+#  ever concatenated into a SQL string.
+# =============================================================================
+
+- function:
+    schema: public
+    name: start_workflow_run
+  configuration:
+    exposed_as: mutation
+  comment: >-
+    Atomic run creation: re-checks membership/role in the database, checks quota
+    against used + in-flight runs under a row lock on the organization, and
+    inserts the workflow_run together with all of its step_runs in one
+    transaction. Returns the created run.
+
+- function:
+    schema: public
+    name: consume_run_quota
+  configuration:
+    exposed_as: mutation
+  comment: >-
+    Increments organizations.quota_used at most once per run, guarded by
+    workflow_runs.quota_counted. Returns the updated organization, or no rows if
+    the run had already been counted.

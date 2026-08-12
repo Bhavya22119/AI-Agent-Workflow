@@ -1,10 +1,18 @@
+import { Workflow } from 'lucide-react';
+
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen items-center justify-center p-4 relative overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-slate-950 to-slate-950"></div>
-      <div className="relative z-10 w-full max-w-md">
-        {children}
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-6 px-4 py-10">
+      <div className="flex items-center gap-2.5">
+        <span className="grid size-9 place-items-center rounded-lg bg-accent text-white">
+          <Workflow className="size-5" />
+        </span>
+        <div>
+          <p className="text-sm font-semibold text-ink">Agent Flow</p>
+          <p className="text-xs text-ink-3">AI agent workflows, with two layers of permissions</p>
+        </div>
       </div>
+      <div className="w-full max-w-sm">{children}</div>
     </div>
   );
 }

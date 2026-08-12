@@ -1,22 +1,72 @@
-import React from 'react';
-import { RunStatus } from '@/lib/types';
+'use client';
 
-const statusColors: Record<RunStatus | 'default', string> = {
-  pending: 'bg-zinc-100 text-zinc-600 border border-zinc-200',
-  running: 'bg-blue-50 text-blue-700 border border-blue-200',
-  paused: 'bg-amber-50 text-amber-700 border border-amber-200',
-  completed: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-  failed: 'bg-rose-50 text-rose-700 border border-rose-200',
-  skipped: 'bg-zinc-100 text-zinc-500 border border-zinc-200 line-through',
-  default: 'bg-indigo-50 text-indigo-700 border border-indigo-200',
+import type { ReactNode } from 'react';
+import { cn } from '@/lib/utils';
+import { RUN_STATUS_LABEL, STEP_STATUS_LABEL, statusTone } from '@/lib/format';
+import type { OrgRole, RunStatus, StepRunStatus } from '@/lib/types';
+
+export function Badge({
+  children,
+  className,
+  tone,
+}: {
+  children: ReactNode;
+  className?: string;
+  tone?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap',
+        tone ?? 'bg-surface-2 text-ink-2',
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+export function RunStatusBadge({
+  status,
+  className,
+}: {
+  status: RunStatus;
+  className?: string;
+}) {
+  return (
+    <Badge tone={statusTone(status)} className={className}>
+      {status === 'running' ? <span className="size-1.5 rounded-full bg-current animate-step-pulse" /> : null}
+      {RUN_STATUS_LABEL[status] ?? status}
+    </Badge>
+  );
+}
+
+export function StepStatusBadge({
+  status,
+  className,
+}: {
+  status: StepRunStatus;
+  className?: string;
+}) {
+  return (
+    <Badge tone={statusTone(status)} className={className}>
+      {status === 'running' ? <span className="size-1.5 rounded-full bg-current animate-step-pulse" /> : null}
+      {STEP_STATUS_LABEL[status] ?? status}
+    </Badge>
+  );
+}
+
+const ROLE_TONE: Record<OrgRole, string> = {
+  owner: 'bg-accent-soft text-accent-ink',
+  editor: 'bg-info-soft text-info',
+  viewer: 'bg-surface-2 text-ink-3',
 };
 
-export function Badge({ status, label, className = '' }: { status?: RunStatus, label: string, className?: string }) {
-  const colorClass = status ? statusColors[status] : statusColors.default;
+export function RoleBadge({ role, className }: { role: OrgRole; className?: string }) {
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorClass} ${className}`}>
-      {status === 'running' && <span className="w-2 h-2 mr-1.5 rounded-full bg-blue-400 animate-pulse-ring" />}
-      {label}
-    </span>
+    <Badge tone={ROLE_TONE[role]} className={className}>
+      {role}
+    </Badge>
   );
 }

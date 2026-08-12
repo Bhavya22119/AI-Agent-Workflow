@@ -1,37 +1,254 @@
+# =============================================================================
+#  Hasura Actions — the only way the outside world can start, resume or reject a
+#  workflow run.
+#
+#  Handlers live in the Next.js app (src/app/api/hasura/actions/*), so a single
+#  Vercel deployment serves both the UI and the action handlers.
+#
+#  Trust model
+#  -----------
+#  * Hasura verifies the caller's JWT and sends the verified identity in
+#    `session_variables` (x-hasura-user-id / x-hasura-role). The handler reads
+#    the caller from there and NEVER from the action input: an endpoint that
+#    accepts `user_id` in its request body lets anyone approve anyone else's
+#    gate by guessing a UUID.
+#  * `x-hasura-action-secret` proves the request really came from Hasura, so the
+#    handler URL cannot be called directly to impersonate a session.
+#  * forward_client_headers is off: the handler has no need for the raw JWT.
+#
+#  `{{APP_BASE_URL}}`, `{{HASURA_ACTION_SECRET}}` are substituted with real
+#  values by scripts/hasura-apply.mjs from the local environment, so no secret
+#  and no deployment URL is committed here.
+#
+#  NOTE: actions.graphql is generated from this file by the apply script; edit
+#  this file, not that one.
+# =============================================================================
+
 actions:
   - name: triggerWorkflowRun
+    comment: >-
+      Manual trigger. Verifies the caller is owner/editor in the workflow's org,
+      checks the org quota, creates the run plus all step_runs atomically, then
+      executes the steps in the background so the mutation returns immediately
+      and the client can watch progress over the step_runs subscription.
     definition:
       kind: synchronous
-      handler: '{{NHOST_FUNCTIONS_URL}}/trigger-workflow-run'
-      forward_client_headers: true
+      type: mutation
+      handler: '{{APP_BASE_URL}}/api/hasura/actions/trigger-workflow-run'
+      forward_client_headers: false
+      timeout: 30
+      arguments:
+        - name: workflow_id
+          type: uuid!
+        - name: payload
+          type: jsonb
+      output_type: TriggerRunOutput!
+      headers:
+        - name: x-hasura-action-secret
+          value: '{{HASURA_ACTION_SECRET}}'
     permissions:
-      - role: owner
-      - role: editor
+      - role: user
+
   - name: approveStep
+    comment: >-
+      Clears a paused approval_gate. The handler re-checks the approver's org
+      role (Layer 2, mid-execution) before recording approved_by/approved_at and
+      resuming the run from the following step. This cannot be a row permission:
+      it is a decision about a run in flight, not a row read or write.
     definition:
       kind: synchronous
-      handler: '{{NHOST_FUNCTIONS_URL}}/approve-step'
-      forward_client_headers: true
+      type: mutation
+      handler: '{{APP_BASE_URL}}/api/hasura/actions/approve-step'
+      forward_client_headers: false
+      timeout: 30
+      arguments:
+        - name: step_run_id
+          type: uuid!
+        - name: note
+          type: String
+      output_type: StepDecisionOutput!
+      headers:
+        - name: x-hasura-action-secret
+          value: '{{HASURA_ACTION_SECRET}}'
     permissions:
-      - role: owner
-      - role: editor
-  - name: invokeWorkflowWebhook
+      - role: user
+
+  - name: rejectStep
+    comment: >-
+      The other half of the gate: records rejected_by/rejected_at and terminates
+      the run as cancelled. Same role check as approveStep.
     definition:
       kind: synchronous
-      handler: '{{NHOST_FUNCTIONS_URL}}/invoke-workflow-webhook'
-    permissions: []
+      type: mutation
+      handler: '{{APP_BASE_URL}}/api/hasura/actions/reject-step'
+      forward_client_headers: false
+      timeout: 30
+      arguments:
+        - name: step_run_id
+          type: uuid!
+        - name: note
+          type: String
+      output_type: StepDecisionOutput!
+      headers:
+        - name: x-hasura-action-secret
+          value: '{{HASURA_ACTION_SECRET}}'
+    permissions:
+      - role: user
+
+  - name: triggerWorkflowWebhook
+    comment: >-
+      Inbound webhook endpoint for external systems, exposed to the unauthorized
+      `public` role: there is no user session, so authentication is the
+      per-trigger secret (24 random bytes, never readable over GraphQL) compared
+      in constant time by the handler.
+    definition:
+      kind: synchronous
+      type: mutation
+      handler: '{{APP_BASE_URL}}/api/hasura/actions/trigger-workflow-webhook'
+      forward_client_headers: false
+      timeout: 30
+      arguments:
+        - name: trigger_id
+          type: uuid!
+        - name: secret
+          type: String!
+        - name: payload
+          type: jsonb
+      output_type: TriggerRunOutput!
+      headers:
+        - name: x-hasura-action-secret
+          value: '{{HASURA_ACTION_SECRET}}'
+    permissions:
+      - role: public
+      - role: user
+
+  - name: createOrganization
+    comment: >-
+      Creates an organization and the caller's owner membership in one nested
+      insert, so an org can never exist without an owner. Needs the admin secret
+      to write the membership row for a user who is not yet a member of anything.
+    definition:
+      kind: synchronous
+      type: mutation
+      handler: '{{APP_BASE_URL}}/api/hasura/actions/create-organization'
+      forward_client_headers: false
+      timeout: 30
+      arguments:
+        - name: name
+          type: String!
+      output_type: CreateOrganizationOutput!
+      headers:
+        - name: x-hasura-action-secret
+          value: '{{HASURA_ACTION_SECRET}}'
+    permissions:
+      - role: user
+
+  - name: upsertOrgMember
+    comment: >-
+      Adds or re-roles a member by email address. An Action rather than a plain
+      mutation because resolving an email to a user id requires reading
+      auth.users beyond what any tenant is allowed to see.
+    definition:
+      kind: synchronous
+      type: mutation
+      handler: '{{APP_BASE_URL}}/api/hasura/actions/upsert-org-member'
+      forward_client_headers: false
+      timeout: 30
+      arguments:
+        - name: org_id
+          type: uuid!
+        - name: email
+          type: String!
+        - name: role
+          type: String!
+      output_type: OrgMemberOutput!
+      headers:
+        - name: x-hasura-action-secret
+          value: '{{HASURA_ACTION_SECRET}}'
+    permissions:
+      - role: user
+
+  - name: getWebhookEndpoint
+    comment: >-
+      Query action. Returns the callable webhook URL and secret for a trigger,
+      to owners of that trigger's organization only. This is the sole path by
+      which a secret leaves the database.
+    definition:
+      kind: synchronous
+      type: query
+      handler: '{{APP_BASE_URL}}/api/hasura/actions/get-webhook-endpoint'
+      forward_client_headers: false
+      timeout: 30
+      arguments:
+        - name: trigger_id
+          type: uuid!
+      output_type: WebhookEndpointOutput!
+      headers:
+        - name: x-hasura-action-secret
+          value: '{{HASURA_ACTION_SECRET}}'
+    permissions:
+      - role: user
+
 custom_types:
+  enums: []
   input_objects: []
+  scalars: []
   objects:
-    - name: TriggerWorkflowRunOutput
+    - name: TriggerRunOutput
+      description: Result of starting a workflow run.
       fields:
         - name: workflow_run_id
+          type: uuid!
+        - name: workflow_id
           type: uuid!
         - name: status
           type: String!
-    - name: ApproveStepOutput
+        - name: step_count
+          type: Int!
+
+    - name: StepDecisionOutput
+      description: Result of approving or rejecting a paused approval_gate step.
       fields:
+        - name: step_run_id
+          type: uuid!
         - name: workflow_run_id
           type: uuid!
-        - name: status
+        - name: decision
+          type: String!
+        - name: run_status
+          type: String!
+
+    - name: CreateOrganizationOutput
+      fields:
+        - name: org_id
+          type: uuid!
+        - name: name
+          type: String!
+        - name: slug
+          type: String!
+        - name: role
+          type: String!
+
+    - name: OrgMemberOutput
+      fields:
+        - name: org_member_id
+          type: uuid!
+        - name: user_id
+          type: uuid!
+        - name: email
+          type: String!
+        - name: role
+          type: String!
+
+    - name: WebhookEndpointOutput
+      fields:
+        - name: trigger_id
+          type: uuid!
+        - name: graphql_endpoint
+          type: String!
+        - name: rest_endpoint
+          type: String!
+        - name: secret
+          type: String!
+        - name: sample_curl
           type: String!

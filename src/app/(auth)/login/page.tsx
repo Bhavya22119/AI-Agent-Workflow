@@ -1,45 +1,103 @@
-"use client";
-import { useState } from 'react';
-import { useSignInEmailPassword } from '@nhost/react';
-import { useRouter } from 'next/navigation';
+'use client';
+
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useAuth } from '@/components/providers/auth-provider';
 import { Button } from '@/components/ui/button';
+import { Field, Input } from '@/components/ui/field';
+import { Alert, PageLoader } from '@/components/ui/feedback';
+import { Card } from '@/components/ui/surface';
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
+  const { signIn, user, ready } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  // Set when the app bounced an unauthenticated visitor here from a deep link.
+  const next = searchParams.get('next');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { signInEmailPassword, isLoading, error } = useSignInEmailPassword();
-  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleLogin = async () => {
-    const result = await signInEmailPassword(email, password);
-    if (!result.error) window.location.href = '/workflows';
-  };
+  useEffect(() => {
+    if (ready && user) router.replace(next && next.startsWith('/') ? next : '/dashboard');
+  }, [ready, user, router, next]);
+
+  async function onSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      await signIn(email, password);
+      router.replace(next && next.startsWith('/') ? next : '/dashboard');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not sign in.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
-    <Card className="p-8">
-      <h1 className="text-2xl font-bold text-center mb-6 text-zinc-900">Welcome Back</h1>
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-zinc-600 mb-1">Email</label>
-          <Input type="email" value={email} onChange={e => setEmail(e.target.value)} />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-zinc-600 mb-1">Password</label>
-          <Input type="password" value={password} onChange={e => setPassword(e.target.value)} />
-        </div>
-        {error && <p className="text-rose-500 text-sm">{error.message}</p>}
-        <Button onClick={handleLogin} className="w-full" disabled={isLoading || !email || !password}>
-          {isLoading ? 'Signing in...' : 'Sign In'}
+    <Card className="p-5">
+      <h1 className="text-base font-semibold text-ink">Sign in</h1>
+      <p className="mt-1 text-sm text-ink-3">Use one of the seeded demo accounts, or your own.</p>
+
+      <form onSubmit={onSubmit} className="mt-5 space-y-4">
+        <Field label="Email" htmlFor="email">
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="owner-a@agentflow.test"
+          />
+        </Field>
+        <Field
+          label="Password"
+          htmlFor="password"
+          hint={
+            <Link
+              href="/forgot-password"
+              className="text-xs font-medium text-accent hover:underline"
+            >
+              Forgot password?
+            </Link>
+          }
+        >
+          <Input
+            id="password"
+            type="password"
+            autoComplete="current-password"
+            required
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder="••••••••"
+          />
+        </Field>
+
+        {error ? <Alert tone="danger">{error}</Alert> : null}
+
+        <Button type="submit" variant="primary" size="lg" loading={submitting} className="w-full">
+          Sign in
         </Button>
-      </div>
-      <p className="mt-4 text-center text-sm text-zinc-500">
-        Don't have an account? <Link href="/signup" className="text-blue-600 hover:text-blue-700">Sign up</Link>
-      </p>
-      <p className="mt-2 text-center text-sm text-zinc-500">
-        <Link href="/forgot-password" className="text-blue-600 hover:text-blue-700">Forgot your password?</Link>
+      </form>
+
+      <p className="mt-4 text-center text-sm text-ink-3">
+        No account?{' '}
+        <Link href="/signup" className="font-medium text-accent hover:underline">
+          Create one
+        </Link>
       </p>
     </Card>
   );

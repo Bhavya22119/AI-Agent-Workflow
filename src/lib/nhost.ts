@@ -1,33 +1,30 @@
-import { NhostClient } from '@nhost/react';
+/**
+ * The Nhost browser client (SDK v4).
+ *
+ * v4 has no React bindings, which is fine — the session lives in
+ * `nhost.sessionStorage`, which exposes an onChange subscription, so the auth
+ * provider can bind it to React with useSyncExternalStore in a few lines and we
+ * avoid depending on the deprecated @nhost/react package.
+ */
+import { createClient, type NhostClient } from '@nhost/nhost-js';
 
-const isBrowser = typeof window !== 'undefined';
+const subdomain = process.env.NEXT_PUBLIC_NHOST_SUBDOMAIN;
+const region = process.env.NEXT_PUBLIC_NHOST_REGION;
 
-const nhost = new NhostClient({
-  subdomain: process.env.NEXT_PUBLIC_NHOST_SUBDOMAIN || 'local',
-  region: process.env.NEXT_PUBLIC_NHOST_REGION,
-  // For local development
-  ...(process.env.NEXT_PUBLIC_NHOST_BACKEND_URL ? {
-    backendUrl: process.env.NEXT_PUBLIC_NHOST_BACKEND_URL,
-  } : {}),
-  clientStorageType: 'custom',
-  clientStorage: {
-    getItem: (key) => {
-      if (!isBrowser) return null;
-      const val = window.localStorage.getItem(key);
-      console.log(`[Nhost Storage] getItem(${key}) =`, val ? '***' : null);
-      return val;
-    },
-    setItem: (key, value) => {
-      if (!isBrowser) return;
-      console.log(`[Nhost Storage] setItem(${key}, ***)`);
-      window.localStorage.setItem(key, value);
-    },
-    removeItem: (key) => {
-      if (!isBrowser) return;
-      console.log(`[Nhost Storage] removeItem(${key})`);
-      window.localStorage.removeItem(key);
-    }
-  }
-});
+if (!subdomain || !region) {
+  throw new Error(
+    'Missing NEXT_PUBLIC_NHOST_SUBDOMAIN / NEXT_PUBLIC_NHOST_REGION. Copy .env.example to .env.local.',
+  );
+}
 
-export { nhost };
+export const nhost: NhostClient = createClient({ subdomain, region });
+
+export const NHOST_SUBDOMAIN = subdomain;
+export const NHOST_REGION = region;
+
+export const GRAPHQL_HTTP_URL = `https://${subdomain}.hasura.${region}.nhost.run/v1/graphql`;
+export const GRAPHQL_WS_URL = `wss://${subdomain}.hasura.${region}.nhost.run/v1/graphql`;
+
+export function getAccessToken(): string | null {
+  return nhost.getUserSession()?.accessToken ?? null;
+}
