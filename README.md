@@ -301,20 +301,50 @@ first still-pending node.
 
 ## Deployment
 
-The app and its handlers deploy as one Next.js application.
+The app and its handlers deploy as one Next.js application. Three systems have to
+agree on the URL and on two shared secrets; each of the failures below is one of
+them disagreeing.
 
-1. Deploy to Vercel (or any Node host) and note the URL.
-2. Set the environment variables there — everything from `.env.local` except
-   `NEXT_PUBLIC_ACTION_TRANSPORT`, plus `APP_BASE_URL=https://<deployment>`.
-3. Point Hasura at it:
+**1. Host it.** Deploy to Vercel (or any Node host) and attach the domain.
 
-   ```bash
-   APP_BASE_URL=https://<deployment> npm run hasura:apply
-   ```
+**2. Set the environment there** — everything from `.env.local` except
+`NEXT_PUBLIC_ACTION_TRANSPORT`, plus:
 
-   That rewrites the Action, Event Trigger and Cron Trigger URLs in the Hasura
-   metadata and re-asserts consistency.
-4. `npm run verify` — section 7's end-to-end check now passes instead of skipping.
+```
+APP_BASE_URL=https://www.agentora.app
+```
+
+`HASURA_ACTION_SECRET` and `HASURA_WEBHOOK_SECRET` must be **byte-identical** to
+the values in the `.env.local` you run `hasura:apply` from. Those values are baked
+into the Hasura metadata as request headers, and the handler compares them in
+constant time — a mismatch, or a missing variable on the host, is refused with
+`Invalid action secret` before any handler logic runs.
+
+**3. Point Hasura at it.**
+
+```bash
+APP_BASE_URL=https://www.agentora.app npm run hasura:apply
+```
+
+That rewrites all Action, Event Trigger and Cron Trigger URLs in the metadata and
+re-asserts consistency. Re-run it every time the domain changes.
+
+**4. Tell Nhost the domain**, in the Nhost dashboard — this is what makes the email
+links work, and it is not covered by `hasura:apply`:
+
+| Nhost setting | Value |
+| --- | --- |
+| Settings → Auth → **Allowed redirect URLs** | `https://www.agentora.app`, and keep `http://localhost:3000` for local work |
+| Settings → Auth → **Client URL** | `https://www.agentora.app` |
+
+Sign-up verification and password reset send `redirectTo` as the page's own
+origin. Nhost validates it against the allowed-redirect list and refuses anything
+absent from it — an open-redirect guard, since otherwise it could be made to email
+a genuine link, carrying a real token, pointing at someone else's domain. An origin
+that is not listed fails with `The value of "options.redirectTo" is not allowed`.
+
+**5. `npm run verify`** — the end-to-end Action check now passes instead of
+skipping.
 
 `maxDuration` is 60s on the run-executing routes. A run that exceeds it stops
 mid-flight and the nodes already recorded stay recorded. For longer workflows, move
@@ -387,7 +417,7 @@ working, but **schedules and Event Triggers have no such fallback and will not
 fire**. Fix it properly:
 
 ```bash
-APP_BASE_URL=https://your-deployment.vercel.app npm run hasura:apply
+APP_BASE_URL=https://www.agentora.app npm run hasura:apply
 ```
 
 Set the same value in the deployment's own environment, and re-run
@@ -395,6 +425,22 @@ Set the same value in the deployment's own environment, and re-run
 
 For local development, `NEXT_PUBLIC_ACTION_TRANSPORT=direct` avoids the round trip
 entirely.
+
+**`Invalid action secret.`** The request reached the handler, so `APP_BASE_URL` is
+right — but the host's `HASURA_ACTION_SECRET` does not match the one baked into the
+Hasura metadata (or is not set on the host at all). Copy the value from the
+`.env.local` you ran `hasura:apply` from into the deployment's environment and
+redeploy.
+
+**`The value of "options.redirectTo" is not allowed.`** The origin you are on is
+not in Nhost's allowed redirect URLs — including a different *port*, so a dev
+server that fell back to `:3001` fails while `:3000` works. Add the origin under
+Settings → Auth → Allowed redirect URLs, or use the allowed one.
+
+**`Invalid or expired refresh token` on a link you just received.** Nhost rotates a
+refresh token on every use, so a verification link works exactly once. Opening it
+twice — or a page re-running its exchange — spends it. If you have already opened
+it, the address is almost certainly confirmed: just sign in.
 
 **A webhook call returns 409.** Both gates must be open: the workflow's **Active**
 switch and the trigger's **Live** switch. The response body names which one.

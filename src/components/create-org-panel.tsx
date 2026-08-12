@@ -107,13 +107,6 @@ export function CreateOrgPanel({ heading }: { heading?: string }) {
             Create organization
           </Button>
         </form>
-
-        <p className="mt-4 text-xs leading-relaxed text-ink-3">
-          To join an existing organization instead, ask one of its owners to invite this
-          email address from their Members screen. Or sign in with one of the seeded demo
-          accounts — <span className="font-mono">owner-a@agentflow.test</span> — which are
-          already members of a workspace with a workflow to run.
-        </p>
       </Card>
 
       {memberships.length > 0 ? (

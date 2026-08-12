@@ -122,8 +122,34 @@ export async function parseActionRequest<TInput = Record<string, unknown>>(
   }
 
   if (providedActionSecret) {
-    // A wrong secret is a spoofing attempt, not a fallback path.
-    throw new ActionError('UNAUTHENTICATED', 'Invalid action secret.', 401);
+    // A wrong secret is a spoofing attempt, not a fallback path — never fall
+    // through to the bearer branch here.
+    //
+    // But there are two ways to arrive: an attacker guessing, and a deployment
+    // whose HASURA_ACTION_SECRET does not match the value baked into the Hasura
+    // metadata. The second is overwhelmingly more common and used to surface as a
+    // bare "Invalid action secret", which reads as "the caller is wrong" and sends
+    // whoever is deploying to look in the wrong place. Naming the misconfiguration
+    // tells an attacker nothing they did not already know — they sent the secret,
+    // so they know it was rejected.
+    if (!serverEnv.actionSecret) {
+      console.error(
+        '[auth] HASURA_ACTION_SECRET is not set on this deployment, but Hasura sent one.',
+      );
+      throw new ActionError(
+        'MISCONFIGURED',
+        'This deployment has no HASURA_ACTION_SECRET set, so it cannot verify that the ' +
+          'request came from Hasura. Set it to the same value used when the metadata was applied.',
+        500,
+      );
+    }
+    console.error('[auth] action secret mismatch — deployment and Hasura metadata disagree.');
+    throw new ActionError(
+      'UNAUTHENTICATED',
+      "This deployment's HASURA_ACTION_SECRET does not match the one in the Hasura metadata. " +
+        'Re-apply the metadata, or correct the value on the deployment.',
+      401,
+    );
   }
 
   const authorization = req.headers.get('authorization');

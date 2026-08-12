@@ -15,11 +15,17 @@ type Size = 'sm' | 'md' | 'lg';
  *
  * `active:translate-y-px` is the only motion: a press should be felt, not watched.
  */
+/**
+ * `primary` is the page inverted, not a hue: white-on-black in the dark theme and
+ * black-on-white in the light one, via the `--color-action` pair. That keeps the
+ * accent free for links, selection and the live-run indicators, which is what
+ * stops a screen from having two things competing to be the thing you click.
+ */
 const VARIANTS: Record<Variant, string> = {
   primary:
-    'border border-accent bg-accent text-white shadow-sm shadow-accent/25 hover:border-accent-hover hover:bg-accent-hover disabled:border-accent/50 disabled:bg-accent/50',
+    'border border-action bg-action text-action-ink hover:border-action-hover hover:bg-action-hover disabled:border-action/50 disabled:bg-action/50',
   secondary:
-    'border border-line-strong bg-surface text-ink shadow-sm shadow-black/[0.03] hover:border-line-strong hover:bg-surface-2',
+    'border border-line-strong bg-surface text-ink hover:border-line-strong hover:bg-surface-2',
   ghost: 'border border-transparent text-ink-2 hover:bg-surface-2 hover:text-ink',
   danger:
     'border border-danger bg-danger text-white shadow-sm shadow-danger/25 hover:brightness-[0.94]',

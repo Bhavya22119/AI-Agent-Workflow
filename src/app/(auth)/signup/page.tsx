@@ -47,8 +47,15 @@ export default function SignupPage() {
         <EmailSent
           email={email}
           title="Confirm your email"
-          description="Your account exists, but this project requires a verified address before you can sign in. Click the link and you will come straight back, signed in."
+          description="Your account exists, but this project requires a verified address before you can sign in. Click the link in the email — or confirm it below once you have."
           onResend={() => resendVerification(email)}
+          // The password is still in this form's state, so the check is a real
+          // sign-in attempt: it succeeds only once Nhost considers the address
+          // verified, which makes it both the check and the login in one step.
+          onCheckVerified={async () => {
+            await signIn(email, password);
+            router.replace('/onboarding');
+          }}
           footer={
             <Link href="/login" className="block">
               <Button variant="ghost" className="w-full">

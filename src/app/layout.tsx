@@ -29,9 +29,11 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  // Matches --color-canvas in each scheme, so mobile browser chrome does not
+  // leave a lighter strip above a true-black page.
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#fafafa' },
-    { media: '(prefers-color-scheme: dark)', color: '#1a1a1f' },
+    { media: '(prefers-color-scheme: light)', color: '#f6f7fa' },
+    { media: '(prefers-color-scheme: dark)', color: '#000000' },
   ],
 };
 
