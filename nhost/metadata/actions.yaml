@@ -189,6 +189,29 @@ actions:
     permissions:
       - role: user
 
+  - name: rotateWebhookSecret
+    comment: >-
+      Replaces a webhook trigger's secret, owner-only. An Action for the same
+      reason reading it is one: `secret` appears in no select or update
+      permission, so no role can write it either. The new value is generated
+      server-side and never accepted from the caller, and every previously issued
+      secret stops working immediately.
+    definition:
+      kind: synchronous
+      type: mutation
+      handler: '{{APP_BASE_URL}}/api/hasura/actions/rotate-webhook-secret'
+      forward_client_headers: false
+      timeout: 30
+      arguments:
+        - name: trigger_id
+          type: uuid!
+      output_type: WebhookSecretOutput!
+      headers:
+        - name: x-hasura-action-secret
+          value: '{{HASURA_ACTION_SECRET}}'
+    permissions:
+      - role: user
+
 custom_types:
   enums: []
   input_objects: []
@@ -251,4 +274,14 @@ custom_types:
         - name: secret
           type: String!
         - name: sample_curl
+          type: String!
+
+    - name: WebhookSecretOutput
+      description: A webhook trigger's newly generated secret.
+      fields:
+        - name: trigger_id
+          type: uuid!
+        - name: rest_endpoint
+          type: String!
+        - name: secret
           type: String!

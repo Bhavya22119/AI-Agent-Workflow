@@ -1,25 +1,30 @@
 'use client';
 
 import { useState } from 'react';
+import { KeyRound } from 'lucide-react';
 import { useOrg } from '@/components/providers/org-provider';
 import { QuotaMeter } from '@/components/quota-meter';
+import { LlmConnectionsModal } from '@/components/builder/llm-connections';
 import { RoleBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Field, Input, Mono } from '@/components/ui/field';
 import { Alert, PageLoader } from '@/components/ui/feedback';
-import { Card, CardHeader, Stat } from '@/components/ui/surface';
+import { Card, CardHeader, PageHeader, Stat } from '@/components/ui/surface';
 import { useQuery } from '@/hooks/use-query';
 import { millis } from '@/lib/format';
-import { ORG_USAGE, RENAME_ORG } from '@/lib/gql';
+import { LLM_CONNECTIONS, ORG_USAGE, RENAME_ORG } from '@/lib/gql';
+import { describeEndpoint, vendorLabel } from '@/lib/llm-providers';
 import { gqlRequest } from '@/lib/graphql-client';
 import { actionTransport } from '@/lib/actions';
 import { canManageMembers } from '@/lib/step-catalog';
-import type { UsageSummary } from '@/lib/types';
+import type { LlmConnection, UsageSummary } from '@/lib/types';
 
 export default function SettingsPage() {
   const { activeOrgId, activeMembership, role, refresh } = useOrg();
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
+
+  const [connectionsOpen, setConnectionsOpen] = useState(false);
 
   const { data, loading, refetch } = useQuery<{ org_usage_summary: UsageSummary[] }>(
     ORG_USAGE,
@@ -27,6 +32,11 @@ export default function SettingsPage() {
     { skip: !activeOrgId },
   );
   const usage = data?.org_usage_summary?.[0] ?? null;
+
+  const { data: connectionData, refetch: refetchConnections } = useQuery<{
+    llm_connections: LlmConnection[];
+  }>(LLM_CONNECTIONS, { orgId: activeOrgId }, { skip: !activeOrgId });
+  const connections = connectionData?.llm_connections ?? [];
 
   // The field is keyed by org rather than synced from an effect, so switching
   // organization shows the new name without a render that shows the old one.
@@ -61,13 +71,12 @@ export default function SettingsPage() {
   if (loading && !data) return <PageLoader />;
 
   return (
-    <div className="space-y-5">
-      <header>
-        <h1 className="text-xl font-semibold text-ink">Settings</h1>
-        <p className="mt-0.5 text-sm text-ink-3">
-          Organization details, usage, and the identifiers you need for the cross-tenant checks.
-        </p>
-      </header>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Organization"
+        title="Settings"
+        description="Organization details, usage, your LLM endpoints, and the identifiers you need for the cross-tenant checks."
+      />
 
       {feedback ? <Alert tone={feedback.tone}>{feedback.text}</Alert> : null}
 
@@ -113,6 +122,49 @@ export default function SettingsPage() {
           sub="counted against the quota when starting a run"
         />
       </div>
+
+      <Card>
+        <CardHeader
+          title="LLM connections"
+          description="Endpoints your llm_call nodes can use instead of the deployment's own provider."
+          actions={
+            <Button size="sm" onClick={() => setConnectionsOpen(true)}>
+              <KeyRound className="size-3.5" />
+              {canManageMembers(role) ? 'Manage' : 'View'}
+            </Button>
+          }
+        />
+        {connections.length === 0 ? (
+          <p className="px-4 py-4 text-sm text-ink-3">
+            None yet — every <Mono>llm_call</Mono> node uses the provider configured on the server.
+            {canManageMembers(role)
+              ? ' Add one to point a node at your own model.'
+              : ' Only an owner can add one.'}
+          </p>
+        ) : (
+          <ul className="divide-y divide-line text-sm">
+            {connections.map((connection) => (
+              <li key={connection.id} className="flex flex-wrap items-center gap-2 px-4 py-2.5">
+                <span className="w-40 shrink-0 truncate font-medium text-ink">
+                  {connection.name}
+                </span>
+                <span className="shrink-0 text-xs text-ink-3">
+                  {vendorLabel(connection.provider)}
+                </span>
+                <span className="min-w-0 flex-1 truncate font-mono text-xs text-ink-3">
+                  {connection.default_model ?? 'default model'} ·{' '}
+                  {describeEndpoint(connection.protocol, connection.base_url)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="border-t border-line px-4 py-2.5 text-xs leading-relaxed text-ink-3">
+          An API key is stored in a column with no read permission for any role, so it can never be
+          fetched back through the API — not even by the owner who set it. Only the engine reads it,
+          with the admin secret.
+        </p>
+      </Card>
 
       <Card>
         <CardHeader
@@ -171,6 +223,15 @@ export default function SettingsPage() {
           </li>
         </ul>
       </Card>
+
+      <LlmConnectionsModal
+        open={connectionsOpen}
+        onClose={() => setConnectionsOpen(false)}
+        orgId={activeOrgId ?? ''}
+        role={role}
+        connections={connections}
+        onChanged={() => void refetchConnections()}
+      />
     </div>
   );
 }

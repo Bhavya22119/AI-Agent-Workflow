@@ -13,6 +13,9 @@
  *   4. Engine surfaces that must not be writable from a client
  *   5. End-to-end execution: branch, pause, approve, resume, skip
  *   6. Retry, quota, webhook trigger, scheduled + database-event triggers
+ *   7. Per-trigger webhook settings: method, secret location, required
+ *      fields, respond-when-finished, secret rotation
+ *   8. Hasura Action wiring
  *
  * Sections 5 and 6 need the Action handlers running, i.e. `npm run dev` in
  * another terminal. If the app is not reachable they are reported as SKIPPED
@@ -399,6 +402,98 @@ async function main() {
       triggerIds: [scheduleProbeId].filter(Boolean),
     },
   );
+
+  // --- Layer 2 on LLM connections ----------------------------------------
+  // An API key is money and an outbound request, so a connection is owner-only in
+  // the same way a db_write step is. The key itself is a stronger case: it is
+  // writable but has no select permission at all, so it cannot come back out of
+  // the API even for the owner who set it.
+  const editorAddsConnection = await userGql(
+    editorA.token,
+    `mutation ($org: uuid!) {
+       insert_llm_connections_one(
+         object: {
+           org_id: $org
+           name: "editor probe"
+           provider: "groq"
+           protocol: "openai"
+           api_key: "sk-editor-should-not-be-able-to-do-this"
+         }
+       ) { id }
+     }`,
+    { org: orgA.id },
+  );
+  check(
+    'Editor cannot add an LLM connection (owner-only)',
+    refused(editorAddsConnection),
+    JSON.stringify(editorAddsConnection.data),
+  );
+
+  const ownerAddsConnection = await userGql(
+    ownerA.token,
+    `mutation ($org: uuid!) {
+       insert_llm_connections_one(
+         object: {
+           org_id: $org
+           name: "verify probe"
+           provider: "groq"
+           protocol: "openai"
+           base_url: "https://api.groq.com/openai/v1"
+           default_model: "llama-3.1-8b-instant"
+           api_key: "sk-verify-probe-key-value"
+         }
+       ) { id name provider protocol }
+     }`,
+    { org: orgA.id },
+  );
+  const connectionId = ownerAddsConnection.data?.insert_llm_connections_one?.id;
+  check(
+    'Owner CAN add one (positive control)',
+    Boolean(connectionId),
+    errorText(ownerAddsConnection),
+  );
+
+  const readsKey = await userGql(
+    ownerA.token,
+    `query { llm_connections { id api_key } }`,
+  );
+  check(
+    'api_key is not selectable by anyone, including the owner who set it',
+    /api_key/.test(errorText(readsKey)) && !readsKey.data,
+    errorText(readsKey) || JSON.stringify(readsKey.data),
+  );
+
+  const movesOrg = await userGql(
+    ownerA.token,
+    `mutation ($id: uuid!, $org: uuid!) {
+       update_llm_connections_by_pk(pk_columns: { id: $id }, _set: { org_id: $org }) { id }
+     }`,
+    { id: connectionId, org: orgB.id },
+  );
+  check(
+    'a connection cannot be moved into another organization',
+    refused(movesOrg),
+    JSON.stringify(movesOrg.data),
+  );
+
+  const orgBSeesConnections = await userGql(
+    ownerB.token,
+    `query { llm_connections { id name } }`,
+  );
+  check(
+    'Org B cannot see Org A\'s connections',
+    (orgBSeesConnections.data?.llm_connections ?? []).every(
+      (connection) => connection.id !== connectionId,
+    ),
+    JSON.stringify(orgBSeesConnections.data),
+  );
+
+  if (connectionId) {
+    await adminGql(
+      `mutation ($id: uuid!) { delete_llm_connections_by_pk(id: $id) { id } }`,
+      { id: connectionId },
+    );
+  }
 
   /* ------------------------------------------------------------------ 4 */
   section('4. Engine tables are not client-writable');
@@ -1004,7 +1099,277 @@ async function main() {
   }
 
   /* ------------------------------------------------------------------ 7 */
-  section('7. Hasura Action wiring');
+  section('7. Per-trigger webhook settings');
+
+  if (!reachable) {
+    skip('webhook settings', `the app is not reachable at ${APP} — run "npm run dev"`);
+  } else {
+    // Two webhook triggers on one workflow are two endpoints, and each one's
+    // config decides how it behaves. These checks exist because every one of
+    // these rules is enforced in the handler rather than merely displayed: a
+    // method the trigger does not accept, a secret in the wrong place or a
+    // payload missing a required field must all be refused before a run exists.
+    // A previous run that died before its cleanup would collide on the slug.
+    await adminGql(
+      `mutation { delete_organizations(where: { slug: { _eq: "verify-webhook-probe" } }) { affected_rows } }`,
+    );
+    const settingsOrg = await adminGql(
+      `mutation {
+         insert_organizations_one(
+           object: {
+             name: "verify: webhook settings"
+             slug: "verify-webhook-probe"
+             quota_limit: 200
+           }
+         ) { id }
+       }`,
+    );
+    const settingsOrgId = settingsOrg.insert_organizations_one.id;
+
+    const settingsWorkflow = await adminGql(
+      `mutation ($org: uuid!) {
+         insert_workflows_one(
+           object: {
+             org_id: $org
+             name: "Webhook settings"
+             is_active: true
+             workflow_steps: {
+               data: [
+                 {
+                   position: 1
+                   key: "classify"
+                   type: llm_call
+                   name: "Classify"
+                   config: { provider: "stub", prompt: "terrible service" }
+                   next: { main: "save" }
+                 }
+                 {
+                   position: 2
+                   key: "save"
+                   type: db_write
+                   name: "Save"
+                   config: { key: "verdict", value: "{{prev.text}}" }
+                   next: {}
+                 }
+               ]
+             }
+           }
+         ) { id }
+       }`,
+      { org: settingsOrgId },
+    );
+    const settingsWorkflowId = settingsWorkflow.insert_workflows_one.id;
+
+    /** A webhook trigger with the given config, plus its generated secret. */
+    async function webhookWith(config) {
+      const created = await adminGql(
+        `mutation ($object: workflow_triggers_insert_input!) {
+           insert_workflow_triggers_one(object: $object) { id }
+         }`,
+        {
+          object: {
+            workflow_id: settingsWorkflowId,
+            type: 'webhook',
+            is_enabled: true,
+            config,
+          },
+        },
+      );
+      const id = created.insert_workflow_triggers_one.id;
+      const loaded = await adminGql(
+        `query ($id: uuid!) { workflow_triggers_by_pk(id: $id) { secret } }`,
+        { id },
+      );
+      return { id, secret: loaded.workflow_triggers_by_pk.secret };
+    }
+
+    function callWebhook(trigger, { method = 'POST', headers = {}, body, query = '' } = {}) {
+      return fetch(`${APP}/api/webhooks/${trigger.id}${query}`, {
+        method,
+        headers: { 'content-type': 'application/json', ...headers },
+        body: method === 'GET' ? undefined : body,
+      });
+    }
+
+    try {
+      // --- method ---------------------------------------------------------
+      const postOnly = await webhookWith({ label: 'POST only', method: 'POST' });
+      let response = await callWebhook(postOnly, {
+        method: 'PUT',
+        headers: { 'x-webhook-secret': postOnly.secret },
+        body: '{"text":"x"}',
+      });
+      let payload = await response.json().catch(() => ({}));
+      check(
+        'a webhook set to POST refuses PUT with 405',
+        response.status === 405,
+        `got ${response.status}`,
+      );
+      check(
+        'and the refusal names the method it does accept',
+        /POST/.test(payload.message ?? ''),
+        payload.message,
+      );
+
+      response = await callWebhook(postOnly, {
+        headers: { 'x-webhook-secret': postOnly.secret },
+        body: '{"text":"x"}',
+      });
+      check('and accepts POST', response.status === 202, `got ${response.status}`);
+
+      // --- secret location ------------------------------------------------
+      const queryAuth = await webhookWith({ label: 'GET', method: 'GET', auth: 'query' });
+      response = await callWebhook(queryAuth, {
+        method: 'GET',
+        query: `?text=hello+there&secret=${queryAuth.secret}`,
+      });
+      payload = await response.json().catch(() => ({}));
+      check(
+        'a GET webhook accepts the secret in the query string',
+        response.status === 202,
+        `got ${response.status}`,
+      );
+
+      if (payload.workflow_run_id) {
+        const started = await adminGql(
+          `query ($id: uuid!) { workflow_runs_by_pk(id: $id) { trigger_payload } }`,
+          { id: payload.workflow_run_id },
+        );
+        const triggerPayload = started.workflow_runs_by_pk.trigger_payload ?? {};
+        check(
+          'a GET request\'s query string becomes the run payload',
+          triggerPayload.text === 'hello there',
+          JSON.stringify(triggerPayload),
+        );
+        check(
+          'and the secret is stripped out of it',
+          !('secret' in triggerPayload),
+          JSON.stringify(triggerPayload),
+        );
+      }
+
+      const bearerAuth = await webhookWith({ label: 'Bearer', auth: 'bearer' });
+      response = await callWebhook(bearerAuth, {
+        headers: { authorization: `Bearer ${bearerAuth.secret}` },
+        body: '{"text":"x"}',
+      });
+      check(
+        'a bearer-authenticated webhook accepts the right token',
+        response.status === 202,
+        `got ${response.status}`,
+      );
+      response = await callWebhook(bearerAuth, {
+        headers: { authorization: 'Bearer not-the-secret' },
+        body: '{"text":"x"}',
+      });
+      check('and refuses a wrong one with 401', response.status === 401, `got ${response.status}`);
+
+      // --- required fields ------------------------------------------------
+      const strict = await webhookWith({
+        label: 'Strict',
+        require_fields: ['text', 'customer'],
+      });
+      const runsBefore = await adminGql(
+        `query ($wf: uuid!) {
+           workflow_runs_aggregate(where: { workflow_id: { _eq: $wf } }) {
+             aggregate { count }
+           }
+         }`,
+        { wf: settingsWorkflowId },
+      );
+      response = await callWebhook(strict, {
+        headers: { 'x-webhook-secret': strict.secret },
+        body: '{"text":"only one field"}',
+      });
+      payload = await response.json().catch(() => ({}));
+      check(
+        'a payload missing a required field is refused with 400',
+        response.status === 400,
+        `got ${response.status}`,
+      );
+      check(
+        'and the missing field is named',
+        /customer/.test(payload.message ?? ''),
+        payload.message,
+      );
+
+      response = await callWebhook(strict, {
+        headers: { 'x-webhook-secret': strict.secret },
+        body: '{"text":"a","customer":"acme"}',
+      });
+      check('and a complete payload is accepted', response.status === 202, `got ${response.status}`);
+
+      const runsAfter = await adminGql(
+        `query ($wf: uuid!) {
+           workflow_runs_aggregate(where: { workflow_id: { _eq: $wf } }) {
+             aggregate { count }
+           }
+         }`,
+        { wf: settingsWorkflowId },
+      );
+      check(
+        'the refused call created no run at all',
+        runsAfter.workflow_runs_aggregate.aggregate.count ===
+          runsBefore.workflow_runs_aggregate.aggregate.count + 1,
+        `${runsBefore.workflow_runs_aggregate.aggregate.count} -> ${runsAfter.workflow_runs_aggregate.aggregate.count}`,
+      );
+
+      // --- respond when finished ------------------------------------------
+      const waiting = await webhookWith({ label: 'Sync', response: 'when_finished' });
+      response = await callWebhook(waiting, {
+        headers: { 'x-webhook-secret': waiting.secret },
+        body: '{"text":"terrible"}',
+      });
+      payload = await response.json().catch(() => ({}));
+      check(
+        'a "when the run finishes" webhook answers 200, not 202',
+        response.status === 200,
+        `got ${response.status}`,
+      );
+      check('and reports the run status', payload.status === 'completed', payload.status);
+      check('and returns the final step output', payload.output != null, JSON.stringify(payload.output));
+      check(
+        'and the rows the run saved, interpolated',
+        payload.outputs?.[0]?.key === 'verdict' && payload.outputs?.[0]?.value === 'negative',
+        JSON.stringify(payload.outputs),
+      );
+
+      // --- rotation --------------------------------------------------------
+      const rotating = await webhookWith({ label: 'Rotate' });
+      const replacement = 'f'.repeat(48);
+      await adminGql(
+        `mutation ($id: uuid!, $secret: String!) {
+           update_workflow_triggers_by_pk(
+             pk_columns: { id: $id }
+             _set: { secret: $secret }
+           ) { id }
+         }`,
+        { id: rotating.id, secret: replacement },
+      );
+      response = await callWebhook(rotating, {
+        headers: { 'x-webhook-secret': rotating.secret },
+        body: '{"text":"x"}',
+      });
+      check(
+        'replacing a secret stops the previous one working',
+        response.status === 401,
+        `got ${response.status}`,
+      );
+      response = await callWebhook(rotating, {
+        headers: { 'x-webhook-secret': replacement },
+        body: '{"text":"x"}',
+      });
+      check('and the replacement works', response.status === 202, `got ${response.status}`);
+    } finally {
+      await adminGql(
+        `mutation ($org: uuid!) { delete_organizations_by_pk(id: $org) { id } }`,
+        { org: settingsOrgId },
+      );
+    }
+  }
+
+  /* ------------------------------------------------------------------ 8 */
+  section('8. Hasura Action wiring');
 
   // (a) Hasura's half: the actions exist with the right argument types, and the
   //     role permissions on them are enforced by Hasura before any handler runs.

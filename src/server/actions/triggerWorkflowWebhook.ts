@@ -15,6 +15,16 @@
  *
  * The run still goes through start_workflow_run(), so an inbound webhook is
  * subject to exactly the same quota rules as a human pressing Run.
+ *
+ * ---------------------------------------------------------------------------
+ *  Per-trigger settings
+ * ---------------------------------------------------------------------------
+ *  Two webhook triggers on one workflow are different endpoints, and they are
+ *  allowed to behave differently: which HTTP verb they accept, where the secret
+ *  goes, which payload fields are mandatory, and whether the caller gets an
+ *  immediate 202 or waits for the run to finish. Those live in the trigger's
+ *  `config` and are enforced here — not in the route — so the GraphQL Action and
+ *  the REST alias cannot drift apart.
  */
 import { after } from 'next/server';
 import { ActionError, secretsMatch } from '../auth';
@@ -22,6 +32,7 @@ import { adminGraphql } from '../hasura';
 import { runInBackground } from '../engine/runner';
 import { startRun } from '../engine/store';
 import type { Json } from '../engine/types';
+import { webhookSettings, type WebhookSettings } from '@/lib/trigger-config';
 import { countStepRuns, requireUuid } from './shared';
 import type { TriggerRunOutput } from './triggerWorkflowRun';
 
@@ -31,33 +42,92 @@ export interface TriggerWebhookInput {
   payload?: Json;
 }
 
+/** What the transport knows that the payload does not. */
+export interface WebhookInvocation {
+  /** The HTTP verb the request arrived with; null for the GraphQL Action path. */
+  method?: string | null;
+  /** True when the caller can hold the connection open until the run finishes. */
+  canWait?: boolean;
+}
+
+export interface WebhookRunResult extends TriggerRunOutput {
+  settings: WebhookSettings;
+  /** Present only when the caller waited for the run. */
+  finished?: {
+    status: string;
+    error: string | null;
+    duration_ms: number | null;
+    /** The last completed step's output — normally what the caller wants back. */
+    output: Json;
+    /** Rows the run's db_write steps saved. */
+    outputs: Array<{ key: string; value: Json }>;
+    /** False when the run was still going when the wait timed out. */
+    complete: boolean;
+  };
+}
+
 const OPAQUE = 'Unknown trigger, or the secret is incorrect.';
+
+/**
+ * How long to hold a `when_finished` request open. Runs are allowed to outlive
+ * it; the response then reports `status: running` rather than pretending the
+ * work failed, and the execution keeps going via `after()`.
+ */
+const WAIT_BUDGET_MS = 45_000;
+
+interface TriggerRow {
+  id: string;
+  type: string;
+  secret: string;
+  is_enabled: boolean;
+  config: Record<string, Json> | null;
+  workflow: { id: string; org_id: string; is_active: boolean };
+}
+
+/** Payload keys the trigger insists on, checked before any run is created. */
+function assertRequiredFields(payload: Json | undefined, settings: WebhookSettings): void {
+  if (settings.requireFields.length === 0) return;
+
+  const object =
+    payload && typeof payload === 'object' && !Array.isArray(payload)
+      ? (payload as Record<string, Json>)
+      : null;
+
+  const missing = settings.requireFields.filter((field) => {
+    const value = object?.[field];
+    return value === undefined || value === null || value === '';
+  });
+
+  if (missing.length > 0) {
+    throw new ActionError(
+      'PAYLOAD_INVALID',
+      `This webhook requires ${missing.length === 1 ? 'the field' : 'the fields'} ${missing
+        .map((field) => `\`${field}\``)
+        .join(', ')} in the request body.`,
+      400,
+    );
+  }
+}
 
 // The Caller is intentionally unused: this action authenticates with the
 // trigger's secret, not with a user session, so it takes no second parameter.
 export async function triggerWorkflowWebhook(
   input: TriggerWebhookInput,
-): Promise<TriggerRunOutput> {
+  invocation: WebhookInvocation = {},
+): Promise<WebhookRunResult> {
   const triggerId = requireUuid(input.trigger_id, 'trigger_id');
   if (typeof input.secret !== 'string' || input.secret.length === 0) {
     throw new ActionError('UNAUTHENTICATED', OPAQUE, 401);
   }
 
-  const data = await adminGraphql<{
-    workflow_triggers_by_pk: {
-      id: string;
-      type: string;
-      secret: string;
-      is_enabled: boolean;
-      workflow: { id: string; org_id: string; is_active: boolean };
-    } | null;
-  }>(
+  const data = await adminGraphql<{ workflow_triggers_by_pk: TriggerRow | null }>(
     `query LoadWebhookTrigger($id: uuid!) {
        workflow_triggers_by_pk(id: $id) {
          id
          type
          secret
          is_enabled
+         config
          workflow { id org_id is_active }
        }
      }`,
@@ -71,6 +141,20 @@ export async function triggerWorkflowWebhook(
   if (!trigger.is_enabled) {
     throw new ActionError('TRIGGER_DISABLED', 'This webhook trigger is disabled.', 409);
   }
+
+  const settings = webhookSettings(trigger.config);
+
+  // Method is a property of the REST transport only: a GraphQL mutation has no
+  // verb of its own, so the Action path passes null and skips this.
+  if (invocation.method && invocation.method.toUpperCase() !== settings.method) {
+    throw new ActionError(
+      'METHOD_NOT_ALLOWED',
+      `This webhook accepts ${settings.method}, not ${invocation.method.toUpperCase()}.`,
+      405,
+    );
+  }
+
+  assertRequiredFields(input.payload, settings);
 
   const run = await startRun({
     workflowId: trigger.workflow.id,
@@ -90,12 +174,106 @@ export async function triggerWorkflowWebhook(
   );
 
   const stepCount = await countStepRuns(run.id);
-  after(() => runInBackground(run.id));
-
-  return {
+  const base: WebhookRunResult = {
     workflow_run_id: run.id,
     workflow_id: trigger.workflow.id,
     status: 'running',
     step_count: stepCount,
+    settings,
+  };
+
+  /* ------------------------------------------------ answer immediately */
+  if (settings.response !== 'when_finished' || !invocation.canWait) {
+    after(() => runInBackground(run.id));
+    return base;
+  }
+
+  /* --------------------------------------------- or wait for the result */
+  const execution = runInBackground(run.id);
+  const finishedInTime = await Promise.race([
+    execution.then(() => true),
+    new Promise<boolean>((resolve) => setTimeout(() => resolve(false), WAIT_BUDGET_MS)),
+  ]);
+
+  if (!finishedInTime) {
+    // Keep the platform from killing the invocation mid-run: the promise is
+    // already in flight, `after` just keeps it alive past the response.
+    after(() => execution);
+    return { ...base, finished: undefined };
+  }
+
+  const summary = await loadRunSummary(run.id);
+  return {
+    ...base,
+    status: summary.status,
+    finished: { ...summary, complete: true },
+  };
+}
+
+/**
+ * The Hasura Action entry point. Returns exactly the fields the declared output
+ * type has and nothing else, so per-transport extras never leak into the GraphQL
+ * schema's contract.
+ */
+export async function triggerWorkflowWebhookAction(
+  input: TriggerWebhookInput,
+): Promise<TriggerRunOutput> {
+  const result = await triggerWorkflowWebhook(input, { method: null, canWait: false });
+  return {
+    workflow_run_id: result.workflow_run_id,
+    workflow_id: result.workflow_id,
+    status: result.status,
+    step_count: result.step_count,
+  };
+}
+
+/** What a caller that waited gets back: the run's verdict and its outputs. */
+async function loadRunSummary(runId: string): Promise<{
+  status: string;
+  error: string | null;
+  duration_ms: number | null;
+  output: Json;
+  outputs: Array<{ key: string; value: Json }>;
+}> {
+  const data = await adminGraphql<{
+    workflow_runs_by_pk: {
+      status: string;
+      error: string | null;
+      started_at: string;
+      finished_at: string | null;
+      step_runs: Array<{ status: string; output: Json; position: number }>;
+      workflow_outputs: Array<{ key: string; value: Json }>;
+    } | null;
+  }>(
+    `query WebhookRunSummary($id: uuid!) {
+       workflow_runs_by_pk(id: $id) {
+         status
+         error
+         started_at
+         finished_at
+         step_runs(order_by: { position: desc }) { status output position }
+         workflow_outputs(order_by: { created_at: asc }) { key value }
+       }
+     }`,
+    { id: runId },
+  );
+
+  const run = data.workflow_runs_by_pk;
+  if (!run) {
+    return { status: 'unknown', error: null, duration_ms: null, output: null, outputs: [] };
+  }
+
+  const last = run.step_runs.find(
+    (step) => step.status === 'completed' || step.status === 'paused',
+  );
+
+  return {
+    status: run.status,
+    error: run.error,
+    duration_ms: run.finished_at
+      ? new Date(run.finished_at).getTime() - new Date(run.started_at).getTime()
+      : null,
+    output: last?.output ?? null,
+    outputs: run.workflow_outputs,
   };
 }

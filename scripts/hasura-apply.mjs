@@ -29,32 +29,43 @@ import { metadata, log } from './lib/hasura.mjs';
 
 const MD = resolve(ROOT, 'nhost/metadata');
 
-/** Objects owned by this application. Anything else in the metadata is left alone. */
+/**
+ * Objects owned by this application. Anything else in the metadata is left alone.
+ *
+ * Actions and custom types are NOT listed here — they are read out of actions.yaml
+ * at apply time by `ownedNames()` below. A hand-maintained list has to be edited
+ * every time an Action is added, and forgetting to means the live copy is not
+ * dropped before the new one is appended: Hasura then rejects the whole metadata
+ * with "multiple declarations exist for the following actions". Deriving the list
+ * from the file that defines them makes that impossible.
+ *
+ * `legacyActions` / `legacyCustomTypes` are the exception: names that no longer
+ * appear in any YAML but may still be live from an earlier apply, so they have to
+ * be named explicitly to get cleaned up.
+ */
 const OWNED = {
   functions: ['start_workflow_run', 'consume_run_quota'],
-  actions: [
-    'triggerWorkflowRun',
-    'approveStep',
-    'rejectStep',
-    'triggerWorkflowWebhook',
-    'createOrganization',
-    'upsertOrgMember',
-    'getWebhookEndpoint',
-    // legacy names from the previous implementation, removed on apply
-    'invokeWorkflowWebhook',
-  ],
-  customTypes: [
-    'TriggerRunOutput',
-    'StepDecisionOutput',
-    'CreateOrganizationOutput',
-    'OrgMemberOutput',
-    'WebhookEndpointOutput',
-    // legacy
-    'TriggerWorkflowRunOutput',
-    'ApproveStepOutput',
-  ],
+  legacyActions: ['invokeWorkflowWebhook'],
+  legacyCustomTypes: ['TriggerWorkflowRunOutput', 'ApproveStepOutput'],
   cronTriggers: ['workflow_scheduler'],
 };
+
+/** Every action name this app declares, plus the ones it used to. */
+function ownedActionNames(actionsDoc) {
+  return new Set([
+    ...(actionsDoc.actions ?? []).map((action) => action.name),
+    ...OWNED.legacyActions,
+  ]);
+}
+
+/** Every custom type this app declares, plus the ones it used to. */
+function ownedCustomTypeNames(actionsDoc) {
+  const types = actionsDoc.custom_types ?? {};
+  const names = ['enums', 'input_objects', 'objects', 'scalars'].flatMap((kind) =>
+    (types[kind] ?? []).map((entry) => entry.name)
+  );
+  return new Set([...names, ...OWNED.legacyCustomTypes]);
+}
 
 function loadYaml(file) {
   return YAML.parse(readFileSync(resolve(MD, file), 'utf8'));
@@ -234,11 +245,15 @@ async function main() {
   source.functions = (source.functions ?? []).filter(
     (f) => !(f.function.schema === 'public' && OWNED.functions.includes(f.function.name))
   );
-  live.actions = (live.actions ?? []).filter((a) => !OWNED.actions.includes(a.name));
+  const ownedActions = ownedActionNames(actionsDoc);
+  const ownedTypes = ownedCustomTypeNames(actionsDoc);
+  live.actions = (live.actions ?? []).filter((a) => !ownedActions.has(a.name));
   live.custom_types = live.custom_types ?? {};
-  live.custom_types.objects = (live.custom_types.objects ?? []).filter(
-    (o) => !OWNED.customTypes.includes(o.name)
-  );
+  for (const kind of ['enums', 'input_objects', 'objects', 'scalars']) {
+    live.custom_types[kind] = (live.custom_types[kind] ?? []).filter(
+      (entry) => !ownedTypes.has(entry.name)
+    );
+  }
   live.cron_triggers = (live.cron_triggers ?? []).filter(
     (c) => !OWNED.cronTriggers.includes(c.name)
   );

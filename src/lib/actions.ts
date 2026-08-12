@@ -23,6 +23,20 @@
  *  Both transports land in the same handler and are subject to the same
  *  authorization: neither one trusts a caller-supplied user id. `direct` is a
  *  different way to prove who you are, not a way to skip proving it.
+ *
+ * ============================================================================
+ *  Automatic failover
+ * ============================================================================
+ *  The handler URL Hasura calls is fixed when metadata is applied. Deploy the app
+ *  somewhere new and forget to re-apply it, and Hasura answers every Action with
+ *  "http exception when calling webhook" — the app looks broken while nothing
+ *  about the app is wrong. Panels that fetch through an Action simply go blank.
+ *
+ *  So the first such failure switches this module to the direct transport for the
+ *  rest of the session and retries. The request still gets authenticated (by the
+ *  same handler, against Nhost Auth), so nothing is weakened — but the symptom
+ *  becomes a banner telling you to re-run `npm run hasura:apply` instead of a
+ *  dead UI. `transportNotice()` reports it so that banner can exist.
  */
 import { freshAccessToken, gqlRequest, GraphQLError } from './graphql-client';
 import type { Json } from './types';
@@ -136,6 +150,19 @@ export const ACTIONS = {
       }
     `,
   },
+  rotateWebhookSecret: {
+    route: 'rotate-webhook-secret',
+    field: 'rotateWebhookSecret',
+    document: /* GraphQL */ `
+      mutation RotateWebhookSecret($trigger_id: uuid!) {
+        rotateWebhookSecret(trigger_id: $trigger_id) {
+          trigger_id
+          rest_endpoint
+          secret
+        }
+      }
+    `,
+  },
 } satisfies Record<string, ActionSpec>;
 
 export type ActionName = keyof typeof ACTIONS;
@@ -153,19 +180,29 @@ async function callViaHasura<T>(
     return value;
   } catch (error) {
     if (error instanceof GraphQLError) {
-      // The single most likely local-development failure, made actionable.
-      if (/could not connect|connection error|ConnectionError|unexpected/i.test(error.message)) {
-        throw new ActionCallError(
-          'Hasura could not reach the Action handler. If you are running locally, set ' +
-            'NEXT_PUBLIC_ACTION_TRANSPORT=direct in .env.local (see the README).',
-          'HANDLER_UNREACHABLE',
-        );
+      if (isUnreachable(error.message)) {
+        throw new ActionCallError(HANDLER_UNREACHABLE_MESSAGE, 'HANDLER_UNREACHABLE');
       }
       throw new ActionCallError(error.message, error.code);
     }
     throw error;
   }
 }
+
+/**
+ * Hasura's wording for "I could not open a connection to the handler". It is a
+ * transport failure, not a rejection, so it is the one error worth retrying a
+ * different way.
+ */
+function isUnreachable(message: string): boolean {
+  return /http exception|could not connect|connection error|ConnectionError|ECONNREFUSED|timeout|unexpected/i.test(
+    message,
+  );
+}
+
+const HANDLER_UNREACHABLE_MESSAGE =
+  'Hasura cannot reach this app’s Action handler, so it was called directly instead. ' +
+  'Set APP_BASE_URL to this deployment’s URL and re-run `npm run hasura:apply` to fix it properly.';
 
 async function callViaHandler<T>(
   spec: ActionSpec,
@@ -192,21 +229,56 @@ async function callViaHandler<T>(
   return json as T;
 }
 
-/** Invokes an Action over whichever transport is configured. */
-export async function runAction<T>(
-  name: ActionName,
-  variables: Record<string, Json | undefined> = {},
-): Promise<T> {
-  const spec = ACTIONS[name];
-  if (actionTransport === 'hasura') {
-    return callViaHasura<T>(spec, variables);
-  }
+/**
+ * Set once Hasura has proved it cannot reach the handler, so the rest of the
+ * session goes straight to the direct transport instead of paying for a failed
+ * round trip before every call.
+ */
+let failedOver = false;
+const listeners = new Set<() => void>();
 
+/** A note for the UI when the app is running on the fallback transport. */
+export function transportNotice(): string | null {
+  return failedOver ? HANDLER_UNREACHABLE_MESSAGE : null;
+}
+
+/** Subscribe to failover, so a banner can appear without a page reload. */
+export function onTransportChange(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+async function callDirect<T>(
+  spec: ActionSpec,
+  variables: Record<string, Json | undefined>,
+): Promise<T> {
   const token = await freshAccessToken();
   if (!token) {
     throw new ActionCallError('Your session has expired. Sign in again.', 'UNAUTHENTICATED');
   }
   return callViaHandler<T>(spec, variables, token);
+}
+
+/** Invokes an Action over whichever transport is configured, or still working. */
+export async function runAction<T>(
+  name: ActionName,
+  variables: Record<string, Json | undefined> = {},
+): Promise<T> {
+  const spec = ACTIONS[name];
+  if (actionTransport !== 'hasura' || failedOver) {
+    return callDirect<T>(spec, variables);
+  }
+
+  try {
+    return await callViaHasura<T>(spec, variables);
+  } catch (error) {
+    if (error instanceof ActionCallError && error.code === 'HANDLER_UNREACHABLE') {
+      failedOver = true;
+      for (const listener of listeners) listener();
+      return callDirect<T>(spec, variables);
+    }
+    throw error;
+  }
 }
 
 export interface TriggerRunResult {
@@ -229,4 +301,10 @@ export interface WebhookEndpointResult {
   rest_endpoint: string;
   secret: string;
   sample_curl: string;
+}
+
+export interface WebhookSecretResult {
+  trigger_id: string;
+  rest_endpoint: string;
+  secret: string;
 }

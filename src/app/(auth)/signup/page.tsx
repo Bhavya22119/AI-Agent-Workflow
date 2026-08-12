@@ -69,34 +69,39 @@ export default function SignupPage() {
       </p>
 
       <form onSubmit={onSubmit} className="mt-5 space-y-4">
-        <Field label="Name" htmlFor="name">
+        <Field>
           <Input
             id="name"
+            aria-label="Name"
             required
             value={displayName}
             onChange={(event) => setDisplayName(event.target.value)}
-            placeholder="Alex Doe"
+            placeholder="Enter name"
           />
         </Field>
-        <Field label="Email" htmlFor="email">
+        <Field>
           <Input
             id="email"
+            aria-label="Email"
             type="email"
             autoComplete="email"
             required
             value={email}
             onChange={(event) => setEmail(event.target.value)}
+            placeholder="Enter email"
           />
         </Field>
-        <Field label="Password" htmlFor="password" help="At least 8 characters.">
+        <Field help="At least 8 characters.">
           <Input
             id="password"
+            aria-label="Password"
             type="password"
             autoComplete="new-password"
             required
             minLength={8}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
+            placeholder="Enter password"
           />
         </Field>
 

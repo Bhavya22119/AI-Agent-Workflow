@@ -6,7 +6,7 @@ import { useOrg } from '@/components/providers/org-provider';
 import { TriggerIcon } from '@/components/step-icon';
 import { Badge, RunStatusBadge } from '@/components/ui/badge';
 import { Alert, PageLoader } from '@/components/ui/feedback';
-import { Card, CardHeader, EmptyState } from '@/components/ui/surface';
+import { Card, CardHeader, EmptyState, PageHeader } from '@/components/ui/surface';
 import { useSubscription } from '@/hooks/use-subscription';
 import { duration, relativeTime } from '@/lib/format';
 import { ORG_RUNS_SUBSCRIPTION } from '@/lib/gql';
@@ -37,14 +37,12 @@ export default function RunsPage() {
   const runs = data?.workflow_runs ?? [];
 
   return (
-    <div className="space-y-4">
-      <header>
-        <h1 className="text-xl font-semibold text-ink">Runs</h1>
-        <p className="mt-0.5 text-sm text-ink-3">
-          Every run in {activeMembership?.organization.name}, streamed live — whether it was started
-          by a person, a webhook, a schedule or a database event.
-        </p>
-      </header>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Activity"
+        title="Runs"
+        description={`Every run in ${activeMembership?.organization.name ?? 'this organization'}, streamed live — whether it was started by a person, a webhook, a schedule or a database event.`}
+      />
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 

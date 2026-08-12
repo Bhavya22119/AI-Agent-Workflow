@@ -14,11 +14,18 @@ export function StepConfigEditor({
   step,
   disabled,
   onChange,
+  /**
+   * Controls a step type needs that the catalog's field list cannot express —
+   * currently the llm_call connection picker, which has to load the
+   * organization's endpoints and show which URL each one resolves to.
+   */
+  beforeFields,
 }: {
   spec: StepSpec;
   step: DraftStep;
   disabled: boolean;
   onChange: (next: DraftStep) => void;
+  beforeFields?: React.ReactNode;
 }) {
   function setConfigValue(key: string, value: Json) {
     onChange({ ...step, config: { ...step.config, [key]: value } });
@@ -75,6 +82,8 @@ export function StepConfigEditor({
           </div>
         ) : null}
       </div>
+
+      {beforeFields}
 
       {spec.fields.map((field) => (
         <ConfigField

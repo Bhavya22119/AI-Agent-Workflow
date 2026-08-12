@@ -19,9 +19,19 @@ export class GraphQLError extends Error {
   }
 }
 
-/** Turns Hasura's permission errors into something worth showing a user. */
+/**
+ * Turns Hasura's permission errors into something worth showing a user.
+ *
+ * "field 'x' not found in type: 'query_root'" is deliberately NOT treated as a
+ * permission problem. Hasura says that both when a role cannot see a field and
+ * when the table is not tracked at all, and blaming the user's role for an
+ * un-applied migration sends them looking in exactly the wrong place.
+ */
 function humanize(message: string): string {
-  if (/permission|not found in type|Unauthorized/i.test(message)) {
+  if (/not found in type/i.test(message)) {
+    return `${message} — the table may not be tracked yet (run \`npm run hasura:apply\`), or your role cannot see it.`;
+  }
+  if (/permission|Unauthorized/i.test(message)) {
     return `${message} — your role in this organization does not allow that.`;
   }
   return message;

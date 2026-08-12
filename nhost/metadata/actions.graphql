@@ -12,6 +12,7 @@ type Mutation {
   triggerWorkflowWebhook(trigger_id: uuid!, secret: String!, payload: jsonb): TriggerRunOutput!
   createOrganization(name: String!): CreateOrganizationOutput!
   upsertOrgMember(org_id: uuid!, email: String!, role: String!): OrgMemberOutput!
+  rotateWebhookSecret(trigger_id: uuid!): WebhookSecretOutput!
 }
 
 """Result of starting a workflow run."""
@@ -50,4 +51,11 @@ type WebhookEndpointOutput {
   rest_endpoint: String!
   secret: String!
   sample_curl: String!
+}
+
+"""A webhook trigger's newly generated secret."""
+type WebhookSecretOutput {
+  trigger_id: uuid!
+  rest_endpoint: String!
+  secret: String!
 }

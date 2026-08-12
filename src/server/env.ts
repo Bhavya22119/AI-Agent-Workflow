@@ -65,15 +65,29 @@ export const serverEnv = {
     ).replace(/\/+$/, '');
   },
 
+  /**
+   * The fallback LLM, used by any `llm_call` step that has not chosen one of its
+   * organization's own llm_connections. `custom` is the escape hatch: an
+   * OpenAI-compatible endpoint described entirely by LLM_BASE_URL + LLM_API_KEY.
+   */
   llm: {
     provider: (optional('LLM_PROVIDER') ?? 'groq') as
       | 'groq'
       | 'openrouter'
+      | 'openai'
+      | 'anthropic'
       | 'gemini'
+      | 'custom'
       | 'stub',
     model: optional('LLM_MODEL'),
+    /** Overrides the vendor default for the selected provider. */
+    baseUrl: optional('LLM_BASE_URL'),
+    /** Key for `LLM_PROVIDER=custom`. */
+    apiKey: optional('LLM_API_KEY'),
     groqApiKey: optional('GROQ_API_KEY'),
     openRouterApiKey: optional('OPENROUTER_API_KEY'),
+    openAiApiKey: optional('OPENAI_API_KEY'),
+    anthropicApiKey: optional('ANTHROPIC_API_KEY'),
     geminiApiKey: optional('GEMINI_API_KEY'),
   },
 

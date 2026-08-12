@@ -58,6 +58,11 @@ export interface TriggerNodeData extends Record<string, unknown> {
   trigger: DraftTrigger;
   locked: boolean;
   readOnly: boolean;
+  /**
+   * The workflow's Active switch. A trigger is only live when both it and the
+   * workflow are on, so the node cannot show "live" from its own state alone.
+   */
+  workflowActive: boolean;
 }
 
 export type CanvasNode = Node<StepNodeData, 'step'> | Node<TriggerNodeData, 'trigger'>;
@@ -176,6 +181,8 @@ export interface BuildFlowOptions {
   statusByKey?: Map<string, NodeRunState>;
   /** Validation problems keyed by step key. */
   issuesByKey?: Map<string, NodeIssue[]>;
+  /** The workflow's Active switch, needed to draw a trigger as live. */
+  workflowActive?: boolean;
 }
 
 export function buildFlow({
@@ -186,6 +193,7 @@ export function buildFlow({
   canUseTriggerType,
   statusByKey,
   issuesByKey,
+  workflowActive = true,
 }: BuildFlowOptions): { nodes: CanvasNode[]; edges: Edge[] } {
   const entry = entryKey(steps);
   const byKey = new Set(steps.map((step) => step.key));
@@ -206,6 +214,7 @@ export function buildFlow({
         trigger,
         locked: readOnly || !canUseTriggerType(trigger),
         readOnly,
+        workflowActive,
       },
     });
 

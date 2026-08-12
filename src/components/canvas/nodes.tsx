@@ -23,6 +23,7 @@ import {
 import { StepIcon, TriggerIcon } from '@/components/step-icon';
 import { duration } from '@/lib/format';
 import { STEP_CATALOG, TRIGGER_CATALOG } from '@/lib/step-catalog';
+import { triggerDisplayName, webhookSettings } from '@/lib/trigger-config';
 import type { StepRunStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { handlesFor, type StepNodeData, type TriggerNodeData } from './graph-model';
@@ -207,40 +208,74 @@ export const StepNode = memo(function StepNode({
   );
 });
 
+/**
+ * The one line under a trigger's name that says how *this* trigger differs from
+ * another of the same kind: its schedule, its verb and id, its source key.
+ */
+function triggerDetail(trigger: TriggerNodeData['trigger']): string {
+  switch (trigger.type) {
+    case 'scheduled':
+      return trigger.cron_expression || 'no schedule set';
+    case 'webhook': {
+      const settings = webhookSettings(trigger.config);
+      return trigger.id ? `${settings.method} · ${trigger.id.slice(0, 8)}` : `${settings.method} · unsaved`;
+    }
+    case 'database_event': {
+      const source = typeof trigger.config?.source_key === 'string' ? trigger.config.source_key : '';
+      return source ? `on “${source}”` : 'any watched row';
+    }
+    default:
+      return 'Run button';
+  }
+}
+
 export const TriggerNode = memo(function TriggerNode({
   data,
   selected,
 }: NodeProps<Node<TriggerNodeData, 'trigger'>>) {
-  const { trigger } = data;
+  const { trigger, workflowActive } = data;
   const spec = TRIGGER_CATALOG[trigger.type];
+  const name = triggerDisplayName(trigger, spec.label);
+  const external = trigger.type !== 'manual';
+  const live = trigger.is_enabled && (external ? workflowActive : true);
 
   return (
     <div className="relative">
       <div
         className={cn(
-          'node-card-enter flex w-44 items-center gap-2.5 rounded-r-xl rounded-l-[2rem] border bg-surface py-2.5 pr-3 pl-4 shadow-sm transition-all',
+          'node-card-enter flex w-48 items-center gap-2.5 rounded-r-xl rounded-l-[2rem] border bg-surface py-2.5 pr-3 pl-4 shadow-sm transition-all',
           selected ? 'border-accent ring-2 ring-accent/30' : 'border-line hover:border-line-strong',
           !trigger.is_enabled && 'opacity-55',
         )}
       >
-        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-warn-soft text-warn">
+        <span
+          className={cn(
+            'grid size-8 shrink-0 place-items-center rounded-full',
+            live ? 'bg-warn-soft text-warn' : 'bg-surface-2 text-ink-3',
+          )}
+        >
           <TriggerIcon type={trigger.type} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] leading-tight font-medium text-ink">{spec.label}</p>
-          <p className="truncate text-[10px] text-ink-3">
-            {trigger.type === 'scheduled' && trigger.cron_expression
-              ? trigger.cron_expression
-              : trigger.is_enabled
-                ? 'enabled'
-                : 'disabled'}
+          <p className="truncate text-[13px] leading-tight font-medium text-ink" title={name}>
+            {name}
           </p>
+          <p className="truncate font-mono text-[10px] text-ink-3">{triggerDetail(trigger)}</p>
         </div>
-        {!trigger.id ? (
-          <span className="rounded bg-warn-soft px-1 py-0.5 text-[9px] font-semibold text-warn">
-            NEW
-          </span>
-        ) : null}
+
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          {!trigger.id ? (
+            <span className="rounded bg-warn-soft px-1 py-0.5 text-[9px] font-semibold text-warn">
+              NEW
+            </span>
+          ) : null}
+          {external ? (
+            <span
+              title={live ? 'Live — accepting calls' : 'Not live'}
+              className={cn('size-2 rounded-full', live ? 'animate-step-pulse bg-ok' : 'bg-ink-3')}
+            />
+          ) : null}
+        </div>
       </div>
 
       <Handle
@@ -248,7 +283,10 @@ export const TriggerNode = memo(function TriggerNode({
         id="main"
         position={Position.Right}
         isConnectable={false}
-        className="!size-2.5 !rounded-full !border-2 !border-canvas !bg-warn"
+        className={cn(
+          '!size-2.5 !rounded-full !border-2 !border-canvas',
+          live ? '!bg-warn' : '!bg-line-strong',
+        )}
       />
     </div>
   );

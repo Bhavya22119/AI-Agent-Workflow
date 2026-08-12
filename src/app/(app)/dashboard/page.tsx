@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Field, Input, Textarea } from '@/components/ui/field';
 import { Alert, PageLoader } from '@/components/ui/feedback';
 import { Modal } from '@/components/ui/modal';
-import { Card, CardHeader, EmptyState, Stat } from '@/components/ui/surface';
+import { Card, CardHeader, EmptyState, PageHeader, Stat } from '@/components/ui/surface';
 import { useQuery } from '@/hooks/use-query';
 import { useSubscription } from '@/hooks/use-subscription';
 import { runAction, type TriggerRunResult } from '@/lib/actions';
@@ -119,23 +119,24 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-ink">
-            {activeMembership?.organization.name}
-          </h1>
-          <p className="mt-0.5 text-sm text-ink-3">
-            You are {role === 'owner' ? 'an' : 'a'} <span className="font-medium">{role}</span> here
+      <PageHeader
+        eyebrow="Organization"
+        title={activeMembership?.organization.name ?? 'Workflows'}
+        description={
+          <>
+            You are {role === 'owner' ? 'an' : 'a'} <span className="font-medium text-ink-2">{role}</span> here
             {role === 'viewer' ? ' — read-only, and you cannot trigger runs.' : '.'}
-          </p>
-        </div>
-        {canEdit(role) ? (
-          <Button variant="primary" onClick={() => setCreating(true)}>
-            <Plus className="size-4" />
-            New workflow
-          </Button>
-        ) : null}
-      </header>
+          </>
+        }
+        actions={
+          canEdit(role) ? (
+            <Button variant="primary" onClick={() => setCreating(true)}>
+              <Plus className="size-4" />
+              New workflow
+            </Button>
+          ) : null
+        }
+      />
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 

@@ -9,6 +9,7 @@
 
 DROP VIEW IF EXISTS public.org_usage_summary CASCADE;
 
+DROP TABLE IF EXISTS public.llm_connections CASCADE;
 DROP TABLE IF EXISTS public.watched_records CASCADE;
 DROP TABLE IF EXISTS public.notifications CASCADE;
 DROP TABLE IF EXISTS public.workflow_outputs CASCADE;

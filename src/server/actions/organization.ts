@@ -16,6 +16,7 @@ import { randomBytes } from 'node:crypto';
 import { ActionError, requireOrgRole, requireUserId, type Caller, type OrgRole } from '../auth';
 import { adminGraphql } from '../hasura';
 import { serverEnv } from '../env';
+import { publicBaseUrl } from '../request-url';
 import { optionalString, requireUuid } from './shared';
 
 export interface CreateOrganizationInput {
@@ -196,7 +197,10 @@ export async function getWebhookEndpoint(
   }
 
   const graphqlEndpoint = serverEnv.graphqlUrl;
-  const restEndpoint = `${serverEnv.appBaseUrl}/api/webhooks/${trigger.id}`;
+  // Built from the host this request actually arrived on, so the URL an owner
+  // copies works even when APP_BASE_URL still points at wherever the app used to
+  // live. See src/server/request-url.ts.
+  const restEndpoint = `${await publicBaseUrl()}/api/webhooks/${trigger.id}`;
   const sampleCurl = [
     `curl -sS -X POST '${graphqlEndpoint}' \\`,
     `  -H 'content-type: application/json' \\`,
@@ -217,5 +221,79 @@ export async function getWebhookEndpoint(
     rest_endpoint: restEndpoint,
     secret: trigger.secret,
     sample_curl: sampleCurl,
+  };
+}
+
+export interface RotateWebhookSecretInput {
+  trigger_id: string;
+}
+
+export interface WebhookSecretOutput {
+  trigger_id: string;
+  rest_endpoint: string;
+  secret: string;
+}
+
+/**
+ * Replaces a webhook trigger's secret.
+ *
+ * A secret that can never be changed is a secret you can never un-leak: once it
+ * has been pasted into a chat or committed to somebody else's repository, the only
+ * remedies without this are deleting the trigger (which changes its URL and
+ * breaks every caller) or leaving it compromised.
+ *
+ * It has to be an Action rather than a plain mutation for the same reason reading
+ * it does: `secret` is not in any select or update permission, so no role can
+ * write it either. The new value is generated here — never accepted from the
+ * caller — and every previously issued secret stops working the moment this
+ * returns.
+ */
+export async function rotateWebhookSecret(
+  input: RotateWebhookSecretInput,
+  caller: Caller,
+): Promise<WebhookSecretOutput> {
+  const userId = requireUserId(caller);
+  const triggerId = requireUuid(input.trigger_id, 'trigger_id');
+
+  const data = await adminGraphql<{
+    workflow_triggers_by_pk: {
+      id: string;
+      type: string;
+      workflow: { org_id: string };
+    } | null;
+  }>(
+    `query LoadTriggerForRotate($id: uuid!) {
+       workflow_triggers_by_pk(id: $id) {
+         id
+         type
+         workflow { org_id }
+       }
+     }`,
+    { id: triggerId },
+  );
+
+  const trigger = data.workflow_triggers_by_pk;
+  if (!trigger) {
+    throw new ActionError('NOT_FOUND', 'Not found, or you do not have access to it.', 404);
+  }
+  await requireOrgRole(userId, trigger.workflow.org_id, ['owner']);
+
+  if (trigger.type !== 'webhook') {
+    throw new ActionError('NOT_A_WEBHOOK', 'This trigger is not a webhook trigger.', 400);
+  }
+
+  // Same shape as the column default: 24 random bytes, hex-encoded.
+  const secret = randomBytes(24).toString('hex');
+  await adminGraphql(
+    `mutation RotateSecret($id: uuid!, $secret: String!) {
+       update_workflow_triggers_by_pk(pk_columns: { id: $id }, _set: { secret: $secret }) { id }
+     }`,
+    { id: triggerId, secret },
+  );
+
+  return {
+    trigger_id: trigger.id,
+    rest_endpoint: `${await publicBaseUrl()}/api/webhooks/${trigger.id}`,
+    secret,
   };
 }

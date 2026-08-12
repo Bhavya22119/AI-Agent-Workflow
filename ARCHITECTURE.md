@@ -9,6 +9,7 @@ organizations ──┬── org_members ── auth.users
                 │               └── workflow_runs ── step_runs
                 ├── workflow_outputs      (written by db_write steps)
                 ├── notifications         (written by notify steps)
+                ├── llm_connections       (per-org model endpoints; api_key is write-only)
                 └── watched_records       (the table database_event triggers watch)
 ```
 
@@ -113,6 +114,34 @@ patches its `type` to `db_write`. And `workflow_triggers.type` is absent from th
 column list, making a trigger's kind immutable, so a manual trigger cannot be converted
 into a webhook. The Action handlers re-check the same rule, so the UI's disabled buttons
 are a courtesy, not the enforcement.
+
+### Column-level permissions: a value that goes in and never comes back
+
+Two secrets in this schema are never readable through the API by anyone —
+`workflow_triggers.secret` and `llm_connections.api_key`. Both are absent from every
+`select_permissions` column list while remaining present in the insert list, which is a
+distinction Hasura enforces at the schema level: asking for `api_key` is not a denied
+field, it is a field that does not exist in the `user` role's schema at all.
+
+That matters most for the API key. The tempting place to put one is the step's own
+`config` JSONB, next to the prompt and the model — and that would make it readable by
+every **viewer** in the organization, because a workflow definition is something viewers
+are supposed to be able to read. Moving it into its own table with its own column
+permission is what keeps "a viewer can read the workflow" from also meaning "a viewer can
+read the key that workflow spends".
+
+The consequence is that a key cannot be edited in the usual read-modify-write way, since
+there is nothing to read. So the editor sends `api_key` only when it has been re-typed and
+omits the column otherwise, and rotating a webhook secret is an Action that generates the
+new value server-side rather than a mutation that accepts one.
+
+A third rule falls out of the same table: creating an `llm_connection` is owner-only, for
+the same reason `db_write` is. It spends money and reaches an endpoint of the user's
+choosing — which is also why a connection's custom base URL goes through the same SSRF
+guard as the `http_request` node, and why a step's `connection_id` is resolved with an
+`org_id` predicate. Without that predicate, pasting another tenant's connection id into a
+step's config would spend their key: the same class of hole as guessing a workflow id, one
+level down.
 
 ### Why approvals cannot be a permission at all
 

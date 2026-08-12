@@ -161,6 +161,26 @@ export interface WorkflowOutput {
   created_at: string;
 }
 
+/**
+ * A per-organization LLM endpoint an `llm_call` step can point at.
+ *
+ * `api_key` is deliberately absent: it has no select permission on any role, so
+ * this is the complete set of fields the client can ever see.
+ */
+export interface LlmConnection {
+  id: string;
+  org_id: string;
+  name: string;
+  /** Vendor id from VENDORS in lib/llm-providers, e.g. `groq`, `ollama`, `custom`. */
+  provider: string;
+  /** What the engine dispatches on. */
+  protocol: 'openai' | 'anthropic' | 'gemini';
+  base_url: string | null;
+  default_model: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /** Draft shapes used by the builder before rows exist in the database. */
 export interface DraftStep {
   /** Stable node id: the canvas node id, and what edges point at. */

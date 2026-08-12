@@ -41,7 +41,7 @@ import {
 } from '@xyflow/react';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { canUseStepType, canUseTriggerType } from '@/lib/step-catalog';
+import { canUseStepType, canUseTriggerType, TRIGGER_CATALOG } from '@/lib/step-catalog';
 import type { NodeIssue } from '@/lib/validation';
 import type { DraftStep, DraftTrigger, Json, OrgRole, StepType, TriggerType } from '@/lib/types';
 import { edgeTypes } from './edges';
@@ -60,7 +60,7 @@ import {
   type HandleId,
   type NodeRunState,
 } from './graph-model';
-import { StepInspector, TriggerInspector } from './inspector';
+import { StepInspector, TriggerInspector, type LlmConnectionContext } from './inspector';
 import { NodePalette } from './node-palette';
 import { nodeTypes } from './nodes';
 
@@ -81,6 +81,8 @@ export interface WorkflowCanvasProps {
   onListen?: (triggerType: string) => void;
   /** The workflow's own Active switch — one of the two gates on external calls. */
   workflowActive?: boolean;
+  /** The organization's LLM endpoints, offered by llm_call nodes. */
+  llm?: LlmConnectionContext;
   className?: string;
   /** Extra controls rendered in the canvas's top-left panel. */
   toolbar?: React.ReactNode;
@@ -106,6 +108,7 @@ function CanvasInner({
   issuesByKey,
   onListen,
   workflowActive = true,
+  llm,
   className,
   toolbar,
 }: WorkflowCanvasProps) {
@@ -134,10 +137,11 @@ function CanvasInner({
         triggers,
         readOnly,
         role,
+        workflowActive,
         statusByKey ? [...statusByKey.entries()].sort() : null,
         issuesByKey ? [...issuesByKey.entries()].sort() : null,
       ]),
-    [steps, triggers, readOnly, role, statusByKey, issuesByKey],
+    [steps, triggers, readOnly, role, workflowActive, statusByKey, issuesByKey],
   );
 
   const derived = useMemo(
@@ -150,6 +154,7 @@ function CanvasInner({
         canUseTriggerType: (trigger) => canUseTriggerType(trigger.type, role),
         statusByKey,
         issuesByKey,
+        workflowActive,
       }),
     // `signature` stands in for these by value; see above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -298,19 +303,35 @@ function CanvasInner({
 
   const addTrigger = useCallback(
     (type: TriggerType) => {
-      onTriggersChange((current) => [
-        ...current,
-        {
-          key: `draft-trigger-${type}-${current.length + 1}`,
-          type,
-          config: {
-            ...(type === 'database_event' ? { source_key: 'support_ticket' } : {}),
-            ui: { x: -340, y: current.length * 100 - 110 } as unknown as Json,
+      onTriggersChange((current) => {
+        // Built against the keys actually in use, not the array length: deleting a
+        // trigger and adding another would otherwise reuse a live key, and two
+        // triggers sharing one key are edited as if they were the same trigger.
+        const used = new Set(current.map((trigger) => trigger.key));
+        let key = `draft-${type}-1`;
+        for (let index = 1; used.has(key); index += 1) key = `draft-${type}-${index + 1}`;
+
+        // Numbered from the count of this type, so the second webhook is "Webhook 2"
+        // rather than another node called "Webhook".
+        const sameType = current.filter((trigger) => trigger.type === type).length;
+        const spec = TRIGGER_CATALOG[type];
+        const label = sameType === 0 ? spec.label : `${spec.label} ${sameType + 1}`;
+
+        return [
+          ...current,
+          {
+            key,
+            type,
+            config: {
+              label,
+              ...(type === 'database_event' ? { source_key: 'support_ticket' } : {}),
+              ui: { x: -340, y: current.length * 100 - 110 } as unknown as Json,
+            },
+            cron_expression: type === 'scheduled' ? '*/5 * * * *' : null,
+            is_enabled: true,
           },
-          cron_expression: type === 'scheduled' ? '*/5 * * * *' : null,
-          is_enabled: true,
-        },
-      ]);
+        ];
+      });
       setPaletteOpen(false);
     },
     [onTriggersChange],
@@ -437,6 +458,7 @@ function CanvasInner({
         <StepInspector
           step={selectedStep}
           locked={readOnly || !canUseStepType(selectedStep.type, role)}
+          llm={llm}
           onChange={(nextStep) =>
             onStepsChange((current) =>
               current.map((step) => (step.key === nextStep.key ? nextStep : step)),

@@ -469,3 +469,64 @@ export const WATCHED_RECORDS = /* GraphQL */ `
     }
   }
 `;
+
+/* --------------------------------------------------------- LLM connections */
+
+/**
+ * `api_key` is not requested here because it cannot be: the column is absent from
+ * the select permission, so asking for it is a schema error rather than a leak.
+ */
+export const LLM_CONNECTIONS = /* GraphQL */ `
+  query LlmConnections($orgId: uuid!) {
+    llm_connections(where: { org_id: { _eq: $orgId } }, order_by: { name: asc }) {
+      id
+      org_id
+      name
+      provider
+      protocol
+      base_url
+      default_model
+      created_at
+      updated_at
+    }
+  }
+`;
+
+export const INSERT_LLM_CONNECTION = /* GraphQL */ `
+  mutation InsertLlmConnection($object: llm_connections_insert_input!) {
+    insert_llm_connections_one(object: $object) {
+      id
+      name
+      provider
+      protocol
+      base_url
+      default_model
+    }
+  }
+`;
+
+/**
+ * `_set` is built by the caller so that leaving the API key field blank omits the
+ * column entirely — editing a connection's model should not require re-typing the
+ * key, and there is no way to read the old value back to re-send it.
+ */
+export const UPDATE_LLM_CONNECTION = /* GraphQL */ `
+  mutation UpdateLlmConnection($id: uuid!, $set: llm_connections_set_input!) {
+    update_llm_connections_by_pk(pk_columns: { id: $id }, _set: $set) {
+      id
+      name
+      provider
+      protocol
+      base_url
+      default_model
+    }
+  }
+`;
+
+export const DELETE_LLM_CONNECTION = /* GraphQL */ `
+  mutation DeleteLlmConnection($id: uuid!) {
+    delete_llm_connections_by_pk(id: $id) {
+      id
+    }
+  }
+`;

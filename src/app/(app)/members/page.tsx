@@ -8,7 +8,7 @@ import { RoleBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Field, Input, Select } from '@/components/ui/field';
 import { Alert, PageLoader } from '@/components/ui/feedback';
-import { Card, CardHeader } from '@/components/ui/surface';
+import { Card, CardHeader, PageHeader } from '@/components/ui/surface';
 import { useQuery } from '@/hooks/use-query';
 import { runAction } from '@/lib/actions';
 import { ORG_MEMBERS, REMOVE_MEMBER, UPDATE_MEMBER_ROLE } from '@/lib/gql';
@@ -97,14 +97,12 @@ export default function MembersPage() {
   if (loading && !data) return <PageLoader label="Loading members…" />;
 
   return (
-    <div className="space-y-5">
-      <header>
-        <h1 className="text-xl font-semibold text-ink">Members</h1>
-        <p className="mt-0.5 text-sm text-ink-3">
-          Roles in {activeMembership?.organization.name}. A role here applies to this organization
-          only — the same person can be an owner in one and a viewer in another.
-        </p>
-      </header>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Access"
+        title="Members"
+        description={`Roles in ${activeMembership?.organization.name ?? 'this organization'}. A role here applies to this organization only — the same person can be an owner in one and a viewer in another.`}
+      />
 
       {feedback ? <Alert tone={feedback.tone}>{feedback.text}</Alert> : null}
 
@@ -118,7 +116,7 @@ export default function MembersPage() {
                 required
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                placeholder="teammate@example.com"
+                placeholder="Enter email"
               />
             </Field>
             <Field label="Role" className="w-40">

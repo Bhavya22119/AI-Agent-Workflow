@@ -52,6 +52,10 @@ export const STEP_CATALOG: Record<StepType, StepSpec> = {
     defaults: {
       name: 'Classify with an LLM',
       config: {
+        // Blank means "use the server's configured provider". Set to an
+        // llm_connections id to call the organization's own endpoint instead.
+        connection_id: '',
+        model: '',
         prompt:
           'Classify the sentiment of this message as exactly one word — positive, negative or neutral.\n\nMessage: {{trigger.payload.text}}',
         system: 'You answer with a single lowercase word and nothing else.',
@@ -61,6 +65,9 @@ export const STEP_CATALOG: Record<StepType, StepSpec> = {
       retry_limit: 1,
       timeout_ms: 25000,
     },
+    // `connection_id` and `model` are not in this list: they are rendered by
+    // LlmConnectionField, which has to load the organization's connections and
+    // show the endpoint each one resolves to.
     fields: [
       {
         key: 'prompt',
@@ -71,13 +78,6 @@ export const STEP_CATALOG: Record<StepType, StepSpec> = {
         placeholder: 'Summarise this: {{prev.text}}',
       },
       { key: 'system', label: 'System instruction', kind: 'textarea', rows: 2 },
-      {
-        key: 'model',
-        label: 'Model',
-        kind: 'text',
-        placeholder: 'leave blank for the server default',
-        help: 'Provider comes from LLM_PROVIDER on the server.',
-      },
       { key: 'temperature', label: 'Temperature', kind: 'number', min: 0, max: 2 },
       { key: 'max_tokens', label: 'Max tokens', kind: 'number', min: 1, max: 4096 },
     ],

@@ -139,9 +139,10 @@ function ResetPasswordForm() {
       </p>
 
       <form onSubmit={onSubmit} className="mt-5 space-y-4">
-        <Field label="New password" htmlFor="password" help="At least 8 characters.">
+        <Field help="At least 8 characters.">
           <Input
             id="password"
+            aria-label="New password"
             type="password"
             autoComplete="new-password"
             required
@@ -149,17 +150,20 @@ function ResetPasswordForm() {
             autoFocus
             value={password}
             onChange={(event) => setPassword(event.target.value)}
+            placeholder="Enter new password"
           />
         </Field>
-        <Field label="Confirm password" htmlFor="confirm">
+        <Field>
           <Input
             id="confirm"
+            aria-label="Confirm new password"
             type="password"
             autoComplete="new-password"
             required
             minLength={8}
             value={confirm}
             onChange={(event) => setConfirm(event.target.value)}
+            placeholder="Re-enter new password"
           />
         </Field>
 

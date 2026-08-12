@@ -14,6 +14,7 @@ import {
 } from '@/components/canvas/graph-model';
 import { ExecutionBar } from '@/components/canvas/execution-bar';
 import { manualPayloadFor } from '@/components/canvas/trigger-inspector';
+import { LlmConnectionsModal } from '@/components/builder/llm-connections';
 import { RunStatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/field';
@@ -25,6 +26,7 @@ import { runAction, type TriggerRunResult } from '@/lib/actions';
 import { duration, relativeTime } from '@/lib/format';
 import {
   DELETE_WORKFLOW,
+  LLM_CONNECTIONS,
   RUN_STATUS_SUBSCRIPTION,
   SAVE_WORKFLOW_GRAPH,
   STEP_RUNS_SUBSCRIPTION,
@@ -39,6 +41,7 @@ import { cn } from '@/lib/utils';
 import type {
   DraftStep,
   DraftTrigger,
+  LlmConnection,
   OrgRole,
   RunStatus,
   StepRun,
@@ -60,6 +63,19 @@ export default function WorkflowBuilderPage() {
     { skip: !workflowId },
   );
   const workflow = data?.workflows_by_pk ?? null;
+
+  // Loaded once here rather than inside every llm_call inspector, so opening four
+  // nodes does not mean four identical queries — and so validation can tell that a
+  // step points at a connection that has been deleted.
+  const {
+    data: connectionData,
+    error: connectionError,
+    refetch: refetchConnections,
+  } = useQuery<{ llm_connections: LlmConnection[] }>(
+    LLM_CONNECTIONS,
+    { orgId: workflow?.org_id },
+    { skip: !workflow?.org_id },
+  );
 
   useEffect(() => {
     if (workflow && activeOrgId && workflow.org_id !== activeOrgId) selectOrg(workflow.org_id);
@@ -94,6 +110,10 @@ export default function WorkflowBuilderPage() {
       key={`${workflow.id}:${workflow.updated_at}`}
       workflow={workflow}
       role={role}
+      connections={connectionData?.llm_connections ?? []}
+      connectionsError={connectionError}
+      connectionsReady={Boolean(connectionData) && !connectionError}
+      onConnectionsChanged={refetchConnections}
       feedback={feedback}
       onFeedback={setFeedback}
       onSaved={refetch}
@@ -104,18 +124,28 @@ export default function WorkflowBuilderPage() {
 function WorkflowEditor({
   workflow,
   role,
+  connections,
+  connectionsError,
+  connectionsReady,
+  onConnectionsChanged,
   feedback,
   onFeedback,
   onSaved,
 }: {
   workflow: Workflow;
   role: OrgRole | null;
+  connections: LlmConnection[];
+  connectionsError: string | null;
+  /** False until the connections query has resolved. */
+  connectionsReady: boolean;
+  onConnectionsChanged: () => Promise<void>;
   feedback: Feedback;
   onFeedback: (feedback: Feedback) => void;
   onSaved: () => Promise<void>;
 }) {
   const router = useRouter();
   const readOnly = !canEdit(role);
+  const [connectionsOpen, setConnectionsOpen] = useState(false);
 
   const [name, setName] = useState(workflow.name);
   const [isActive, setIsActive] = useState(workflow.is_active);
@@ -175,7 +205,18 @@ function WorkflowEditor({
     [watchedRunId, watchedSteps, steps],
   );
 
-  const validation = useMemo(() => validateGraph(steps, triggers), [steps, triggers]);
+  // Left undefined until the list has actually arrived: checking a step against an
+  // empty set while the query is in flight would flag every node that uses a
+  // connection, then un-flag it a moment later.
+  const connectionIds = useMemo(
+    () => (connectionsReady ? new Set(connections.map((connection) => connection.id)) : undefined),
+    [connections, connectionsReady],
+  );
+
+  const validation = useMemo(
+    () => validateGraph(steps, triggers, { connectionIds }),
+    [steps, triggers, connectionIds],
+  );
   const graphIssues = validation.byKey.get(GRAPH_KEY) ?? [];
   const canManuallyRun = hasManualTrigger(triggers);
   const blockingIssues = validation.errors;
@@ -536,6 +577,12 @@ function WorkflowEditor({
           statusByKey={statusByKey}
           issuesByKey={validation.byKey}
           workflowActive={isActive}
+          llm={{
+            connections,
+            error: connectionsError,
+            canManage: canManageMembers(role),
+            onManage: () => setConnectionsOpen(true),
+          }}
           onListen={(type) =>
             setListening({ type, since: new Date(Date.now() - 2000).toISOString() })
           }
@@ -562,6 +609,15 @@ function WorkflowEditor({
           }
         />
       </div>
+
+      <LlmConnectionsModal
+        open={connectionsOpen}
+        onClose={() => setConnectionsOpen(false)}
+        orgId={workflow.org_id}
+        role={role}
+        connections={connections}
+        onChanged={() => void onConnectionsChanged()}
+      />
 
       <Modal
         open={confirmDelete}

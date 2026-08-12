@@ -11,14 +11,17 @@
    at a run tells you where it is.
    --------------------------------------------------------------------------- */
 @theme {
-  --color-canvas: oklch(99% 0.002 265);
+  /* The page is a shade cooler and darker than a card. At 99% vs 100% the two
+     were within a hair of each other, so a white card on a white page had only
+     its border to read as raised — which is what made every surface look flat. */
+  --color-canvas: oklch(97.6% 0.004 265);
   --color-surface: oklch(100% 0 0);
-  --color-surface-2: oklch(97.2% 0.003 265);
-  --color-line: oklch(91% 0.005 265);
-  --color-line-strong: oklch(84% 0.008 265);
-  --color-ink: oklch(21% 0.015 265);
-  --color-ink-2: oklch(44% 0.012 265);
-  --color-ink-3: oklch(58% 0.011 265);
+  --color-surface-2: oklch(96.4% 0.004 265);
+  --color-line: oklch(91.5% 0.006 265);
+  --color-line-strong: oklch(85% 0.009 265);
+  --color-ink: oklch(20% 0.016 265);
+  --color-ink-2: oklch(43% 0.013 265);
+  --color-ink-3: oklch(56% 0.012 265);
 
   --color-accent: oklch(52% 0.19 264);
   --color-accent-hover: oklch(46% 0.19 264);
@@ -35,15 +38,42 @@
   --color-info-soft: oklch(96% 0.03 230);
 
   --radius-card: 0.75rem;
+
+  /* Hero-only values, spelled out per theme rather than derived with color-mix().
+     Lightning CSS emits a static fallback for color-mix, and it resolves the
+     token at compile time — which produced a fallback carrying the *dark* values
+     for use in light mode. These two names are not in a Tailwind namespace, so
+     they generate no utilities; they are plain custom properties. */
+  --hero-wash-end: oklch(93.5% 0.006 265);
+  --hero-title-fade: oklch(20% 0.016 265 / 0.4);
+
+  /* Geist, loaded by next/font in app/layout.tsx. The stack after it is the
+     fallback for the moment before the font file lands. */
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
-    sans-serif;
+    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
   --font-mono:
-    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+    var(--font-geist-mono), ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
+    'Liberation Mono', monospace;
 }
 
+/*
+ * Dark theme: a plain `:root` rule, NOT a second `@theme` block.
+ *
+ * `@theme` is a build-time construct — Tailwind hoists it out of whatever it is
+ * nested in and emits the result into `:root` unconditionally. A `@theme` inside
+ * `@media (prefers-color-scheme: dark)` therefore does not become a dark-mode
+ * override; it silently replaces the light values for everyone, and the light
+ * theme stops existing. (That is exactly what had happened here: the compiled CSS
+ * contained one palette, the dark one, with no media query around it.)
+ *
+ * Overriding the same custom properties in ordinary CSS works because `@theme`
+ * emits them as custom properties on `:root` and every utility compiles to
+ * `var(--color-…)`. So `bg-surface` follows this block at runtime, with no
+ * `dark:` variants anywhere and no duplicated utility classes.
+ */
 @media (prefers-color-scheme: dark) {
-  @theme {
+  :root {
     --color-canvas: oklch(17% 0.012 265);
     --color-surface: oklch(21% 0.014 265);
     --color-surface-2: oklch(25% 0.015 265);
@@ -66,6 +96,10 @@
     --color-danger-soft: oklch(29% 0.07 25);
     --color-info: oklch(75% 0.12 230);
     --color-info-soft: oklch(28% 0.05 230);
+
+    /* The hero falls away into the dark at its bottom edge; the arc lights it. */
+    --hero-wash-end: oklch(13% 0.014 265);
+    --hero-title-fade: oklch(96% 0.004 265 / 0.38);
   }
 }
 
@@ -82,6 +116,15 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Headings get slightly tighter tracking than body copy, which is what stops a
+   large system-font heading from looking like enlarged body text. */
+h1,
+h2,
+h3 {
+  letter-spacing: -0.011em;
 }
 
 /* Focus ring: visible for keyboards, quiet for mouse users. */
@@ -137,9 +180,103 @@ body {
   animation: fade-rise 0.18s ease-out both;
 }
 
+/* ---------------------------------------------------------------------------
+   Hero entrance. Two staged reveals: `fade-in` for type, `fade-up` for the
+   larger decorative shapes that travel further.
+
+   Note both keyframes own `transform` outright, so a Tailwind translate utility
+   on the same element is dead code — the animation overwrites it. The source this
+   was adapted from paired `-translate-y-4` with `animate-fade-in`, which never
+   had any effect. Set the offset in the keyframe instead.
+   --------------------------------------------------------------------------- */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-in {
+  animation: fade-in 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-up {
+  animation: fade-up 1.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Staggering, so the eyebrow, headline and subtitle do not all arrive at once. */
+.delay-1 {
+  animation-delay: 0.08s;
+}
+.delay-2 {
+  animation-delay: 0.16s;
+}
+.delay-3 {
+  animation-delay: 0.24s;
+}
+
+/* ---------------------------------------------------------------------------
+   Hero surface: a vertical wash, a ruled grid fading out at the edges, and a
+   wide arc of light along the bottom.
+
+   All three are built from the design tokens rather than the literal #fff /
+   #000 / #e8e8e8 the original used, and therefore need no `dark:` variants: the
+   tokens are already redefined under prefers-color-scheme. Literal whites would
+   also have left a visible seam where the hero meets the page, because this
+   app's canvas is not #fff.
+   --------------------------------------------------------------------------- */
+.hero-wash {
+  background: linear-gradient(
+    to bottom,
+    var(--color-surface) 0%,
+    var(--color-canvas) 40%,
+    var(--hero-wash-end) 100%
+  );
+}
+
+.hero-grid {
+  background-image:
+    linear-gradient(to right, var(--color-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-line) 1px, transparent 1px);
+  background-size: 5rem 4rem;
+  /* Fades the grid out before it reaches an edge, so it reads as texture rather
+     than as a table someone forgot to hide. */
+  mask-image: radial-gradient(ellipse 78% 58% at 50% 0%, #000 55%, transparent 100%);
+}
+
+.hero-arc {
+  background:
+    radial-gradient(closest-side, var(--color-canvas) 78%, transparent 100%),
+    radial-gradient(closest-side, transparent 76%, var(--color-accent) 88%, transparent 100%);
+  opacity: 0.85;
+}
+
+/* The headline: ink fading towards transparent, clipped to the glyphs. */
+.hero-title {
+  background-image: linear-gradient(150deg, var(--color-ink) 28%, var(--hero-title-fade) 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-step-pulse,
-  .animate-fade-rise {
+  .animate-fade-rise,
+  .animate-fade-in,
+  .animate-fade-up {
     animation: none;
   }
 }

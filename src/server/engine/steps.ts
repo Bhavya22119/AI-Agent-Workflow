@@ -7,6 +7,7 @@
  * fail a run on the first try.
  */
 import { serverEnv } from '../env';
+import { loadLlmConnection } from './connections';
 import { callLlm, LlmError } from './llm';
 import { assertPublicUrl, fetchWithTimeout, UnsafeTargetError } from './net';
 import { insertNotification, insertWorkflowOutput } from './store';
@@ -29,6 +30,24 @@ async function executeLlmCall(ctx: StepExecutionContext): Promise<StepOutcome> {
     throw new StepConfigError('llm_call needs a non-empty `prompt`.');
   }
 
+  // A step may point at one of its organization's own endpoints. The lookup is
+  // scoped to this run's org, so a connection id from another tenant resolves to
+  // nothing rather than to their API key.
+  const connectionId =
+    typeof ctx.config.connection_id === 'string' && ctx.config.connection_id.trim()
+      ? ctx.config.connection_id.trim()
+      : null;
+
+  const connection = connectionId
+    ? await loadLlmConnection(ctx.run.org_id, connectionId)
+    : null;
+
+  if (connectionId && !connection) {
+    throw new StepConfigError(
+      'This step uses a saved LLM connection that no longer exists. Pick another one in the node’s Connection field.',
+    );
+  }
+
   const result = await withRetry(
     () =>
       callLlm({
@@ -39,6 +58,7 @@ async function executeLlmCall(ctx: StepExecutionContext): Promise<StepOutcome> {
           typeof ctx.config.provider === 'string' && ctx.config.provider
             ? ctx.config.provider
             : undefined,
+        ...(connection ? { connection } : {}),
         maxTokens: typeof ctx.config.max_tokens === 'number' ? ctx.config.max_tokens : undefined,
         temperature:
           typeof ctx.config.temperature === 'number' ? ctx.config.temperature : undefined,
@@ -59,6 +79,10 @@ async function executeLlmCall(ctx: StepExecutionContext): Promise<StepOutcome> {
       model: result.model,
       stubbed: result.stubbed,
       latency_ms: result.latency_ms,
+      // Which endpoint answered, so a run's output shows where the text came
+      // from — not just that "an LLM" produced it.
+      ...(result.endpoint ? { endpoint: result.endpoint } : {}),
+      ...(connection?.name ? { connection: connection.name } : {}),
       ...(result.usage ? { usage: result.usage as Json } : {}),
     },
   };

@@ -8,23 +8,35 @@
 import { Trash2, X } from 'lucide-react';
 import { StepIcon, TriggerIcon } from '@/components/step-icon';
 import { StepConfigEditor } from '@/components/builder/step-config';
+import { LlmConnectionField } from '@/components/builder/llm-connections';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Mono } from '@/components/ui/field';
 import { Alert } from '@/components/ui/feedback';
 import { STEP_CATALOG, TRIGGER_CATALOG } from '@/lib/step-catalog';
-import type { DraftStep, DraftTrigger } from '@/lib/types';
+import { triggerDisplayName, triggerShortId } from '@/lib/trigger-config';
+import type { DraftStep, DraftTrigger, LlmConnection } from '@/lib/types';
 import { TriggerConfig } from './trigger-inspector';
+
+/** What the llm_call node needs to offer a choice of endpoint. */
+export interface LlmConnectionContext {
+  connections: LlmConnection[];
+  error?: string | null;
+  canManage: boolean;
+  onManage: () => void;
+}
 
 export function StepInspector({
   step,
   locked,
+  llm,
   onChange,
   onDelete,
   onClose,
 }: {
   step: DraftStep;
   locked: boolean;
+  llm?: LlmConnectionContext;
   onChange: (next: DraftStep) => void;
   onDelete: () => void;
   onClose: () => void;
@@ -66,7 +78,25 @@ export function StepInspector({
         </Alert>
       ) : null}
 
-      <StepConfigEditor spec={spec} step={step} disabled={locked} onChange={onChange} />
+      <StepConfigEditor
+        spec={spec}
+        step={step}
+        disabled={locked}
+        onChange={onChange}
+        beforeFields={
+          step.type === 'llm_call' && llm ? (
+            <LlmConnectionField
+              step={step}
+              connections={llm.connections}
+              connectionsError={llm.error}
+              canManage={llm.canManage}
+              disabled={locked}
+              onChange={onChange}
+              onManage={llm.onManage}
+            />
+          ) : null
+        }
+      />
     </InspectorShell>
   );
 }
@@ -91,6 +121,7 @@ export function TriggerInspector({
   onListen?: (triggerType: string) => void;
 }) {
   const spec = TRIGGER_CATALOG[trigger.type];
+  const shortId = triggerShortId(trigger);
 
   return (
     <InspectorShell
@@ -99,8 +130,15 @@ export function TriggerInspector({
           <TriggerIcon type={trigger.type} />
         </span>
       }
-      title={`${spec.label} trigger`}
-      subtitle={<Mono>{trigger.type}</Mono>}
+      // The trigger's own name, so two webhooks on one workflow are not both
+      // titled "Webhook trigger".
+      title={triggerDisplayName(trigger, `${spec.label} trigger`)}
+      subtitle={
+        <span className="flex items-center gap-1.5">
+          <Mono>{trigger.type}</Mono>
+          {shortId ? <Mono>{shortId}</Mono> : <Mono>unsaved</Mono>}
+        </span>
+      }
       onClose={onClose}
       footer={
         locked ? null : (

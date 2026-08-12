@@ -58,16 +58,17 @@ export default function ForgotPasswordPage() {
       </p>
 
       <form onSubmit={onSubmit} className="mt-5 space-y-4">
-        <Field label="Email" htmlFor="email">
+        <Field>
           <Input
             id="email"
+            aria-label="Email"
             type="email"
             autoComplete="email"
             required
             autoFocus
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            placeholder="you@example.com"
+            placeholder="Enter email"
           />
         </Field>
 

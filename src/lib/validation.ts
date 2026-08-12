@@ -42,7 +42,7 @@ function predecessorOf(step: DraftStep, steps: DraftStep[]): DraftStep | undefin
 
 /** Fields a step type is known to publish, used to catch a template that cannot resolve. */
 const OUTPUT_FIELDS: Partial<Record<StepType, string[]>> = {
-  llm_call: ['text', 'provider', 'model', 'stubbed', 'latency_ms', 'usage'],
+  llm_call: ['text', 'provider', 'model', 'stubbed', 'latency_ms', 'usage', 'endpoint', 'connection'],
   http_request: ['status', 'ok', 'url', 'method', 'body'],
   conditional_branch: ['matched', 'branch', 'evaluated', 'followed', 'ends_run'],
   approval_gate: ['approved', 'approved_by', 'approved_at', 'note', 'awaiting_approval', 'message'],
@@ -78,7 +78,20 @@ function checkPrevReferences(
   }
 }
 
-export function validateGraph(steps: DraftStep[], triggers: DraftTrigger[]): GraphIssues {
+export interface ValidateOptions {
+  /**
+   * Ids of the organization's llm_connections. Undefined means "not loaded yet",
+   * which skips the check rather than flagging every step as broken while the
+   * query is in flight.
+   */
+  connectionIds?: Set<string>;
+}
+
+export function validateGraph(
+  steps: DraftStep[],
+  triggers: DraftTrigger[],
+  options: ValidateOptions = {},
+): GraphIssues {
   const issues: NodeIssue[] = [];
   const add = (key: string, severity: NodeIssue['severity'], message: string) =>
     issues.push({ key, severity, message });
@@ -90,9 +103,16 @@ export function validateGraph(steps: DraftStep[], triggers: DraftTrigger[]): Gra
       add(step.key, severity, message);
 
     switch (step.type) {
-      case 'llm_call':
+      case 'llm_call': {
         if (!str(config, 'prompt')) push('error', 'No prompt — this node has nothing to send.');
+        // A connection that has been deleted since the step was configured would
+        // fail at run time with a config error. Say so before the run.
+        const connectionId = str(config, 'connection_id');
+        if (connectionId && options.connectionIds && !options.connectionIds.has(connectionId)) {
+          push('error', 'Its LLM connection has been deleted — pick another one.');
+        }
         break;
+      }
 
       case 'http_request': {
         const url = str(config, 'url');
@@ -187,9 +207,30 @@ export function validateGraph(steps: DraftStep[], triggers: DraftTrigger[]): Gra
     }
   }
 
+  /* ----------------------------------------------------------- triggers */
   const enabled = triggers.filter((trigger) => trigger.is_enabled);
   if (enabled.length === 0) {
     add(GRAPH_KEY, 'warning', 'No enabled trigger, so nothing can start this workflow.');
+  }
+
+  // Two triggers of the same kind with the same name are indistinguishable on the
+  // canvas and in the run history, which makes "which webhook fired?" unanswerable.
+  const nameCounts = new Map<string, number>();
+  for (const trigger of triggers) {
+    const label = str(trigger.config ?? {}, 'label');
+    if (!label) continue;
+    const key = `${trigger.type}:${label.toLowerCase()}`;
+    nameCounts.set(key, (nameCounts.get(key) ?? 0) + 1);
+  }
+  for (const [key, count] of nameCounts) {
+    if (count > 1) {
+      const [type, label] = key.split(':');
+      add(
+        GRAPH_KEY,
+        'warning',
+        `${count} ${type} triggers are both named “${label}” — give them different names so you can tell which one fired.`,
+      );
+    }
   }
 
   const byKey = new Map<string, NodeIssue[]>();

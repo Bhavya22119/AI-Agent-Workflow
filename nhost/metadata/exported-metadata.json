@@ -999,6 +999,164 @@
         },
         {
           "table": {
+            "name": "llm_connections",
+            "schema": "public"
+          },
+          "object_relationships": [
+            {
+              "name": "organization",
+              "using": {
+                "foreign_key_constraint_on": "org_id"
+              }
+            }
+          ],
+          "insert_permissions": [
+            {
+              "role": "user",
+              "permission": {
+                "check": {
+                  "organization": {
+                    "org_members": {
+                      "_and": [
+                        {
+                          "user_id": {
+                            "_eq": "X-Hasura-User-Id"
+                          }
+                        },
+                        {
+                          "role": {
+                            "_eq": "owner"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                "set": {
+                  "created_by": "x-hasura-user-id"
+                },
+                "columns": [
+                  "org_id",
+                  "name",
+                  "provider",
+                  "protocol",
+                  "base_url",
+                  "default_model",
+                  "api_key"
+                ]
+              },
+              "comment": "Layer 2 — a connection spends money and reaches an external endpoint, so only an owner may create one. `api_key` is writable but not selectable: the value goes in and never comes back out."
+            }
+          ],
+          "select_permissions": [
+            {
+              "role": "user",
+              "permission": {
+                "columns": [
+                  "id",
+                  "org_id",
+                  "name",
+                  "provider",
+                  "protocol",
+                  "base_url",
+                  "default_model",
+                  "created_at",
+                  "updated_at"
+                ],
+                "filter": {
+                  "organization": {
+                    "org_members": {
+                      "user_id": {
+                        "_eq": "X-Hasura-User-Id"
+                      }
+                    }
+                  }
+                },
+                "allow_aggregations": true
+              },
+              "comment": "`api_key` is absent from this column list, so a connection's key is never readable over GraphQL by anyone — not even the owner who set it. Only the engine reads it, with the admin secret. Every member may read the rest, because an editor has to be able to pick a connection for an llm_call step."
+            }
+          ],
+          "update_permissions": [
+            {
+              "role": "user",
+              "permission": {
+                "columns": [
+                  "name",
+                  "provider",
+                  "protocol",
+                  "base_url",
+                  "default_model",
+                  "api_key"
+                ],
+                "filter": {
+                  "organization": {
+                    "org_members": {
+                      "_and": [
+                        {
+                          "user_id": {
+                            "_eq": "X-Hasura-User-Id"
+                          }
+                        },
+                        {
+                          "role": {
+                            "_eq": "owner"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                "check": {
+                  "organization": {
+                    "org_members": {
+                      "_and": [
+                        {
+                          "user_id": {
+                            "_eq": "X-Hasura-User-Id"
+                          }
+                        },
+                        {
+                          "role": {
+                            "_eq": "owner"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              "comment": "`org_id` is not in the column list, so a connection cannot be moved into another organization."
+            }
+          ],
+          "delete_permissions": [
+            {
+              "role": "user",
+              "permission": {
+                "filter": {
+                  "organization": {
+                    "org_members": {
+                      "_and": [
+                        {
+                          "user_id": {
+                            "_eq": "X-Hasura-User-Id"
+                          }
+                        },
+                        {
+                          "role": {
+                            "_eq": "owner"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "table": {
             "name": "notifications",
             "schema": "public"
           },
@@ -1063,7 +1221,7 @@
                 "num_retries": 3,
                 "timeout_sec": 60
               },
-              "webhook": "http://localhost:3000/api/hasura/events/notification-created",
+              "webhook": "https://ai-agent-workflow-vpjc.vercel.app/api/hasura/events/notification-created",
               "headers": [
                 {
                   "name": "x-hasura-event-secret",
@@ -1628,7 +1786,7 @@
                 "num_retries": 2,
                 "timeout_sec": 60
               },
-              "webhook": "http://localhost:3000/api/hasura/events/watched-record-created",
+              "webhook": "https://ai-agent-workflow-vpjc.vercel.app/api/hasura/events/watched-record-created",
               "headers": [
                 {
                   "name": "x-hasura-event-secret",
@@ -2816,7 +2974,7 @@
     {
       "name": "approveStep",
       "definition": {
-        "handler": "http://localhost:3000/api/hasura/actions/approve-step",
+        "handler": "https://ai-agent-workflow-vpjc.vercel.app/api/hasura/actions/approve-step",
         "output_type": "StepDecisionOutput!",
         "ignored_client_headers": [
           "Content-Length",
@@ -2863,7 +3021,7 @@
     {
       "name": "createOrganization",
       "definition": {
-        "handler": "http://localhost:3000/api/hasura/actions/create-organization",
+        "handler": "https://ai-agent-workflow-vpjc.vercel.app/api/hasura/actions/create-organization",
         "output_type": "CreateOrganizationOutput!",
         "ignored_client_headers": [
           "Content-Length",
@@ -2906,7 +3064,7 @@
     {
       "name": "getWebhookEndpoint",
       "definition": {
-        "handler": "http://localhost:3000/api/hasura/actions/get-webhook-endpoint",
+        "handler": "https://ai-agent-workflow-vpjc.vercel.app/api/hasura/actions/get-webhook-endpoint",
         "output_type": "WebhookEndpointOutput!",
         "ignored_client_headers": [
           "Content-Length",
@@ -2948,7 +3106,7 @@
     {
       "name": "rejectStep",
       "definition": {
-        "handler": "http://localhost:3000/api/hasura/actions/reject-step",
+        "handler": "https://ai-agent-workflow-vpjc.vercel.app/api/hasura/actions/reject-step",
         "output_type": "StepDecisionOutput!",
         "ignored_client_headers": [
           "Content-Length",
@@ -2993,9 +3151,52 @@
       ]
     },
     {
+      "name": "rotateWebhookSecret",
+      "definition": {
+        "handler": "https://ai-agent-workflow-vpjc.vercel.app/api/hasura/actions/rotate-webhook-secret",
+        "output_type": "WebhookSecretOutput!",
+        "ignored_client_headers": [
+          "Content-Length",
+          "Content-MD5",
+          "User-Agent",
+          "Host",
+          "Origin",
+          "Referer",
+          "Accept",
+          "Accept-Encoding",
+          "Accept-Language",
+          "Accept-Datetime",
+          "Cache-Control",
+          "Connection",
+          "DNT",
+          "Content-Type"
+        ],
+        "headers": [
+          {
+            "name": "x-hasura-action-secret",
+            "value": "<redacted>"
+          }
+        ],
+        "arguments": [
+          {
+            "name": "trigger_id",
+            "type": "uuid!"
+          }
+        ],
+        "type": "mutation",
+        "kind": "synchronous"
+      },
+      "comment": "Replaces a webhook trigger's secret, owner-only. An Action for the same reason reading it is one: `secret` appears in no select or update permission, so no role can write it either. The new value is generated server-side and never accepted from the caller, and every previously issued secret stops working immediately.",
+      "permissions": [
+        {
+          "role": "user"
+        }
+      ]
+    },
+    {
       "name": "triggerWorkflowRun",
       "definition": {
-        "handler": "http://localhost:3000/api/hasura/actions/trigger-workflow-run",
+        "handler": "https://ai-agent-workflow-vpjc.vercel.app/api/hasura/actions/trigger-workflow-run",
         "output_type": "TriggerRunOutput!",
         "ignored_client_headers": [
           "Content-Length",
@@ -3042,7 +3243,7 @@
     {
       "name": "triggerWorkflowWebhook",
       "definition": {
-        "handler": "http://localhost:3000/api/hasura/actions/trigger-workflow-webhook",
+        "handler": "https://ai-agent-workflow-vpjc.vercel.app/api/hasura/actions/trigger-workflow-webhook",
         "output_type": "TriggerRunOutput!",
         "ignored_client_headers": [
           "Content-Length",
@@ -3096,7 +3297,7 @@
     {
       "name": "upsertOrgMember",
       "definition": {
-        "handler": "http://localhost:3000/api/hasura/actions/upsert-org-member",
+        "handler": "https://ai-agent-workflow-vpjc.vercel.app/api/hasura/actions/upsert-org-member",
         "output_type": "OrgMemberOutput!",
         "ignored_client_headers": [
           "Content-Length",
@@ -3257,13 +3458,31 @@
             "type": "String!"
           }
         ]
+      },
+      {
+        "name": "WebhookSecretOutput",
+        "fields": [
+          {
+            "name": "trigger_id",
+            "type": "uuid!"
+          },
+          {
+            "name": "rest_endpoint",
+            "type": "String!"
+          },
+          {
+            "name": "secret",
+            "type": "String!"
+          }
+        ],
+        "description": "A webhook trigger's newly generated secret."
       }
     ]
   },
   "cron_triggers": [
     {
       "name": "workflow_scheduler",
-      "webhook": "http://localhost:3000/api/hasura/events/cron-tick",
+      "webhook": "https://ai-agent-workflow-vpjc.vercel.app/api/hasura/events/cron-tick",
       "schedule": "* * * * *",
       "include_in_metadata": true,
       "payload": {},
