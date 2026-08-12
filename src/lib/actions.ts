@@ -236,16 +236,47 @@ async function callViaHandler<T>(
 }
 
 /**
- * Set once Hasura has proved it cannot reach the handler, so the rest of the
+ * Codes that mean "this request could never have worked over Hasura, for reasons
+ * that are about deployment configuration rather than about the caller".
+ *
+ * All three are safe to retry directly, because the direct transport does not
+ * merely skip the failing check — it proves identity a different way, by handing
+ * the handler a bearer token that the handler verifies against Nhost Auth. What is
+ * unavailable is Hasura's *assertion* of who the caller is; the caller's own token
+ * still has to stand up on its own.
+ */
+const FAILOVER_CODES = new Set([
+  'HANDLER_UNREACHABLE',
+  'MISCONFIGURED',
+  'ACTION_SECRET_MISMATCH',
+]);
+
+const FAILOVER_NOTICE: Record<string, string> = {
+  HANDLER_UNREACHABLE:
+    'Hasura cannot reach this app’s Action handler, so Actions are being called directly instead. ' +
+    'Set APP_BASE_URL to this deployment’s URL and re-run `npm run hasura:apply` to fix it properly.',
+  MISCONFIGURED:
+    'This deployment has no HASURA_ACTION_SECRET, so it cannot verify that a request came from ' +
+    'Hasura — Actions are being called directly instead. Set HASURA_ACTION_SECRET on the ' +
+    'deployment to the value used when the metadata was applied, then redeploy.',
+  ACTION_SECRET_MISMATCH:
+    'This deployment’s HASURA_ACTION_SECRET does not match the one in the Hasura metadata, so ' +
+    'Actions are being called directly instead. Correct the value on the deployment, or re-run ' +
+    '`npm run hasura:apply`.',
+};
+
+/**
+ * Set once the Hasura transport has proved it cannot work, so the rest of the
  * session goes straight to the direct transport instead of paying for a failed
  * round trip before every call.
  */
-let failedOver = false;
+let failedOver: string | null = null;
 const listeners = new Set<() => void>();
 
 /** A note for the UI when the app is running on the fallback transport. */
 export function transportNotice(): string | null {
-  return failedOver ? HANDLER_UNREACHABLE_MESSAGE : null;
+  if (!failedOver) return null;
+  return FAILOVER_NOTICE[failedOver] ?? FAILOVER_NOTICE.HANDLER_UNREACHABLE;
 }
 
 /** Subscribe to failover, so a banner can appear without a page reload. */
@@ -278,8 +309,8 @@ export async function runAction<T>(
   try {
     return await callViaHasura<T>(spec, variables);
   } catch (error) {
-    if (error instanceof ActionCallError && error.code === 'HANDLER_UNREACHABLE') {
-      failedOver = true;
+    if (error instanceof ActionCallError && error.code && FAILOVER_CODES.has(error.code)) {
+      failedOver = error.code;
       for (const listener of listeners) listener();
       return callDirect<T>(spec, variables);
     }

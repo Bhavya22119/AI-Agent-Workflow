@@ -146,8 +146,10 @@ export async function parseActionRequest<TInput = Record<string, unknown>>(
       );
     }
     console.error('[auth] action secret mismatch — deployment and Hasura metadata disagree.');
+    // A distinct code, not UNAUTHENTICATED: the client fails over to the bearer
+    // transport on this, and must not do that for a caller who is simply signed out.
     throw new ActionError(
-      'UNAUTHENTICATED',
+      'ACTION_SECRET_MISMATCH',
       "This deployment's HASURA_ACTION_SECRET does not match the one in the Hasura metadata. " +
         'Re-apply the metadata, or correct the value on the deployment.',
       401,
